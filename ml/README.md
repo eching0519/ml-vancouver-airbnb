@@ -9,10 +9,8 @@ ml/
 ├── README.md                           # This guide
 ├── price-revenue-prediction.ipynb      # Price & revenue prediction models
 ├── neighborhood-clustering.ipynb       # Market segmentation analysis
-├── demand-forecasting.ipynb            # Occupancy & demand forecasting
 ├── market-saturation.ipynb             # Competitive landscape analysis
 ├── guest-preference.ipynb              # Amenity basket analysis
-├── risk-analysis.ipynb                 # Regulatory risk assessment
 └── emerging-hotspots-identification.ipynb # Growth opportunity identification
 ```
 
@@ -96,36 +94,7 @@ ml/
 
 ---
 
-### 3. Demand Forecasting (`demand-forecasting.ipynb`)
-
-**Objective**: Predict occupancy levels and seasonal demand patterns
-
-**Data Sources**:
-- `calendar.csv` for availability patterns
-- `listings-detail.csv` for property characteristics
-- `reviews-detail.csv` for booking indicators
-
-**Models to Implement**:
-- ARIMA for time series forecasting
-- Prophet for seasonal patterns
-- Random Forest for occupancy prediction
-- LSTM (optional) for advanced time series
-
-**Target Variables**:
-- `estimated_occupancy_l365d`
-- Daily availability from calendar data
-- Review frequency as demand proxy
-
-**Implementation Steps**:
-1. Process calendar data for time series
-2. Create seasonal features (month, day of week, holidays)
-3. Train time series models
-4. Forecast future demand by neighborhood
-5. Identify peak and off-peak periods
-
----
-
-### 4. Market Saturation Analysis (`market-saturation.ipynb`)
+### 3. Market Saturation Analysis (`market-saturation.ipynb`)
 
 **Objective**: Analyze competitive landscape and identify successful listing characteristics
 
@@ -154,7 +123,7 @@ ml/
 
 ---
 
-### 5. Guest Preference Analysis (`guest-preference.ipynb`)
+### 4. Guest Preference Analysis (`guest-preference.ipynb`)
 
 **Objective**: Identify amenity combinations that drive high revenue
 
@@ -177,64 +146,6 @@ ml/
 4. Generate association rules
 5. Analyze rules with high revenue correlation
 6. Create amenity recommendation system
-
----
-
-### 6. Risk Analysis (`risk-analysis.ipynb`)
-
-**Objective**: Identify properties at risk of regulatory issues or compliance problems
-
-**Risk Indicators**:
-- Multiple listings per host (`calculated_host_listings_count`)
-- Entire home listings (commercial use indicator)
-- Instant bookable properties
-- License status
-- Host verification levels
-
-**Models to Implement**:
-- Random Forest Classifier
-- K-Nearest Neighbors
-- Logistic Regression
-
-**Risk Categories**:
-- Unlicensed listings
-- Commercial operators
-- Regulatory exposure
-
-**Implementation Steps**:
-1. Define risk categories and labels
-2. Create risk indicator features
-3. Train classification models
-4. Calculate risk scores
-5. Map high-risk areas
-6. Generate compliance recommendations
-
----
-
-### 7. Emerging Hotspots Identification (`emerging-hotspots-identification.ipynb`)
-
-**Objective**: Identify neighborhoods with high growth potential
-
-**Growth Indicators**:
-- Year-over-year listing growth
-- Increasing review frequency
-- Rising average prices
-- Improving occupancy rates
-- New host entry rates
-
-**Analysis Methods**:
-- Trend analysis and growth rate calculation
-- Clustering of growth patterns
-- Correlation analysis
-- Predictive modeling
-
-**Implementation Steps**:
-1. Calculate growth metrics by neighborhood
-2. Identify trending patterns
-3. Apply clustering to growth data
-4. Predict future growth potential
-5. Create hotspot identification algorithm
-6. Generate investment opportunity report
 
 ---
 
