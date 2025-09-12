@@ -10,8 +10,7 @@ ml/
 ├── price-revenue-prediction.ipynb      # Price & revenue prediction models
 ├── neighborhood-clustering.ipynb       # Market segmentation analysis
 ├── market-saturation.ipynb             # Competitive landscape analysis
-├── guest-preference.ipynb              # Amenity basket analysis
-└── emerging-hotspots-identification.ipynb # Growth opportunity identification
+└── guest-preference.ipynb              # Amenity basket analysis
 ```
 
 ## 🚀 Getting Started
