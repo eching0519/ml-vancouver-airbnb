@@ -169,6 +169,7 @@ The dataset consists of 7 main files containing different aspects of Airbnb data
 **File Size**: 76.0 MB  
 **Records**: 2,025,745 records  
 **Fields**: 6 fields
+**Data Range**: 10 August 2025 to 09 Augest 2026
 
 ### Complete Field Descriptions:
 
@@ -189,6 +190,7 @@ The dataset consists of 7 main files containing different aspects of Airbnb data
 **File Size**: 7.0 MB  
 **Records**: 297,612 reviews  
 **Fields**: 2 fields
+**Data Range**: 21 February 2010 to 10 August 2025
 
 ### Complete Field Descriptions:
 
@@ -204,6 +206,7 @@ The dataset consists of 7 main files containing different aspects of Airbnb data
 **File Size**: 89.0 MB  
 **Records**: 305,523 reviews  
 **Fields**: 6 fields
+**Data Range**: 21 February 2010 to 10 August 2025
 
 ### Complete Field Descriptions:
 
@@ -290,7 +293,6 @@ Arbutus Ridge, Downtown, Downtown Eastside, Dunbar Southlands, Fairview, Grandvi
 ## Data Update Information
 
 - **Last Updated**: August 30, 2025
-- **Data Range**: February 2010 to August 2025
 - **Data Source**: Airbnb public data via Inside Airbnb
 - **Scrape Information**: Data includes scrape IDs and timestamps for tracking data collection
 
