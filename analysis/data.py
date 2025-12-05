@@ -1,10 +1,15 @@
 import json
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold, train_test_split
 from sklearn.preprocessing import LabelEncoder
+
+# Suppress FutureWarnings from pandas
+warnings.simplefilter(action='ignore', category=FutureWarning)
+pd.set_option('future.no_silent_downcasting', True)
 
 
 def load_data_raw():
@@ -101,6 +106,10 @@ def basic_cleaning(df):
     df['identity_verified'] = df['host_identity_verified'].fillna(False).astype(int)
     df['instant_bookable'] = df['instant_bookable'].fillna(False).astype(int)
     df['total_beds'] = df['beds'].fillna(0)
+
+    # 7. Handle specific logical NaNs (before dropping actual missing data)
+    if 'reviews_per_month' in df.columns:
+        df['reviews_per_month'] = df['reviews_per_month'].fillna(0)
     
     return df
 
@@ -130,6 +139,34 @@ def prepare_data_pipeline():
     df = load_data_raw()
     df = basic_cleaning(df)
     
+    # 7. Text / NLP Features (Moved BEFORE split to ensure presence)
+    # Hypotheis: Certain keywords in Name/Description signal value (view, luxury, etc.)
+    print("Extracting Text Features...")
+    
+    # Fill text NaNs
+    df['name'] = df['name'].fillna('')
+    df['description'] = df['description'].fillna('')
+    
+    # Length features
+    df['name_len'] = df['name'].apply(len)
+    df['desc_len'] = df['description'].apply(len)
+    
+    # Keywords (Binary Features)
+    keywords = ['view', 'luxury', 'ocean', 'downtown', 'renovated', 'private', 'quiet', 'garden', 'spacious']
+    for word in keywords:
+        # Case insensitive search
+        df[f'txt_{word}'] = (
+            df['name'].str.contains(word, case=False) | 
+            df['description'].str.contains(word, case=False)
+        ).astype(int)
+    
+    text_features = ['name_len', 'desc_len'] + [f'txt_{w}' for w in keywords]
+    
+    # NEW: One-Hot Encoding for Neighborhoods (Keep original for stats)
+    # Using dtype=int to get 0/1 instead of True/False
+    nbhd_dummies = pd.get_dummies(df['neighbourhood_cleansed'], prefix='nbhd', dtype=int)
+    df = pd.concat([df, nbhd_dummies], axis=1)
+    
     # 2. Split
     train_df, test_df = train_test_split(df, test_size=0.2, random_state=42)
     
@@ -140,42 +177,149 @@ def prepare_data_pipeline():
     train_df = train_df.merge(stats, on='neighbourhood_cleansed', how='left')
     test_df = test_df.merge(stats, on='neighbourhood_cleansed', how='left')
     
-    # 5. Impute Missing Values
-    numerical_features = [
-        'accommodates', 'bedrooms', 'bathrooms', 'beds',
-        'host_experience_years', 'host_response_rate_clean', 'host_acceptance_rate_clean',
-        'total_beds'
-    ]
-    numerical_features.extend(stats.columns.tolist())
-    
-    fill_values = train_df[numerical_features].median(numeric_only=True)
-    
-    for col in numerical_features:
-        if col in train_df.columns:
-            train_df[col] = train_df[col].fillna(fill_values.get(col, 0))
-        if col in test_df.columns:
-            test_df[col] = test_df[col].fillna(fill_values.get(col, 0))
-            
-    categorical_features = ['room_type', 'property_type', 'neighbourhood_cleansed']
-    for feature in categorical_features:
-        mode_val = train_df[feature].mode()[0]
-        train_df[feature] = train_df[feature].fillna(mode_val)
-        test_df[feature] = test_df[feature].fillna(mode_val)
-        
-    # 6. Select Features
+    # 5. Define Features
     common_features = [
         'accommodates', 'bedrooms', 'bathrooms', 'beds', 'total_beds',
         'host_experience_years', 'host_response_rate_clean', 'host_acceptance_rate_clean',
         'is_superhost', 'identity_verified', 'instant_bookable',
         'calculated_host_listings_count',
+        # Location Features
+        'latitude', 'longitude',
+        # New Quality Features
+        'reviews_per_month', 'review_scores_rating', 'review_scores_location',
+        'review_scores_cleanliness', 'review_scores_value', 'availability_365',
         # Safe Neighborhood Stats
         'neighborhood_price_mean', 'neighborhood_price_median', 'neighborhood_price_std',
-        'neighborhood_estimated_occupancy_l365d_mean'
+        'neighborhood_estimated_occupancy_l365d_mean',
+        # Categoricals to encode
+        'room_type', 'property_type'
     ]
-    amenity_features = [col for col in train_df.columns if col.startswith('has_')]
-    features = [c for c in common_features + amenity_features if c in train_df.columns]
     
-    # 7. Encode Categoricals
+    amenity_features = [col for col in train_df.columns if col.startswith('has_')]
+    nbhd_features = [col for col in train_df.columns if col.startswith('nbhd_')]
+    
+    # Combined features list
+    candidates = common_features + amenity_features + nbhd_features
+    features = [c for c in candidates if c in train_df.columns]
+    
+    # 6. Handle Missing Values (Smart Imputation instead of Drop)
+    # Strategy: Impute missing reviews with median, but add a flag indicating it was missing
+    review_cols = [
+        'reviews_per_month', 'review_scores_rating', 'review_scores_location',
+        'review_scores_cleanliness', 'review_scores_value'
+    ]
+    
+    for col in review_cols:
+        if col in train_df.columns:
+            # Create indicator flag
+            train_df[f'{col}_missing'] = train_df[col].isna().astype(int)
+            test_df[f'{col}_missing'] = test_df[col].isna().astype(int)
+            
+            # Fill with median
+            median_val = train_df[col].median()
+            train_df[col] = train_df[col].fillna(median_val)
+            test_df[col] = test_df[col].fillna(median_val)
+            
+    # Update features list to include new flags
+    features.extend([f'{c}_missing' for c in review_cols if f'{c}_missing' in train_df.columns])
+
+    # 7. Text / NLP Features (Simple Keyword Extraction)
+    # Already processed before split, just adding to features list
+    features.extend([f for f in text_features if f not in features])
+
+    # 8. Distance Features (Geography)
+    # Vancouver City Center coordinates approx: 49.2819, -123.1187
+    downtown_lat, downtown_lon = 49.2819, -123.1187
+    
+    # Haversine formula approximation (simplified for speed)
+    train_df['dist_to_downtown'] = np.sqrt(
+        ((train_df['latitude'] - downtown_lat) * 111)**2 + 
+        ((train_df['longitude'] - downtown_lon) * 78)**2
+    )
+    test_df['dist_to_downtown'] = np.sqrt(
+        ((test_df['latitude'] - downtown_lat) * 111)**2 + 
+        ((test_df['longitude'] - downtown_lon) * 78)**2
+    )
+    features.append('dist_to_downtown')
+
+    # 9. Interaction Features (Domain Knowledge)
+    # Quality * Popularity
+    train_df['quality_popularity'] = train_df['review_scores_rating'] * train_df['reviews_per_month']
+    test_df['quality_popularity'] = test_df['review_scores_rating'] * test_df['reviews_per_month']
+    features.append('quality_popularity')
+        
+    # Space per person (crowdedness) - Handle division by zero or NaN safely
+    for df_curr in [train_df, test_df]:
+        df_curr['people_per_bedroom'] = df_curr['accommodates'] / (df_curr['bedrooms'].replace(0, 1))
+        df_curr['people_per_bath'] = df_curr['accommodates'] / (df_curr['bathrooms'].replace(0, 1))
+    
+    features.append('people_per_bedroom')
+    features.append('people_per_bath')
+
+    # 10. Target Encoding (Advanced Feature)
+    # Target: Price & Revenue, Feature: neighbourhood_cleansed & property_type
+    print("Applying K-Fold Target Encoding...")
+    
+    target_encode_cols = ['neighbourhood_cleansed', 'property_type']
+    
+    # We need to target encode for BOTH Price and Revenue
+    targets = {
+        'price': train_df['price'], 
+        'rev': train_df['estimated_revenue_l365d']
+    }
+    
+    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+    
+    for col in target_encode_cols:
+        if col not in train_df.columns:
+            continue
+            
+        for target_name, target_vals in targets.items():
+            new_col_name = f'TE_{target_name}_{col}'
+            
+            # Initialize with NaN
+            train_df[new_col_name] = np.nan
+            
+            # 1. Train Set: K-Fold to prevent leakage
+            for tr_ind, val_ind in kf.split(train_df):
+                X_tr, X_val = train_df.iloc[tr_ind], train_df.iloc[val_ind]
+                y_tr = target_vals.iloc[tr_ind]
+                
+                # Calculate means on training fold
+                means = pd.DataFrame({'cat': X_tr[col], 'target': y_tr}).groupby('cat')['target'].mean()
+                
+                # Map to validation fold
+                train_df.loc[train_df.index[val_ind], new_col_name] = X_val[col].map(means)
+            
+            # Fill NaNs in Train with global mean
+            global_mean = target_vals.mean()
+            train_df[new_col_name] = train_df[new_col_name].fillna(global_mean)
+            
+            # 2. Test Set: Map using full training set means
+            full_means = pd.DataFrame({'cat': train_df[col], 'target': target_vals}).groupby('cat')['target'].mean()
+            test_df[new_col_name] = test_df[col].map(full_means)
+            test_df[new_col_name] = test_df[new_col_name].fillna(global_mean)
+            
+            features.append(new_col_name)
+
+    # 11. Encode Categoricals
+    # One-Hot Encode room_type for better distinction
+    if 'room_type' in train_df.columns:
+        rt_dummies_train = pd.get_dummies(train_df['room_type'], prefix='rt', dtype=int)
+        rt_dummies_test = pd.get_dummies(test_df['room_type'], prefix='rt', dtype=int)
+        
+        # Align columns (in case test set is missing some room types)
+        rt_dummies_test = rt_dummies_test.reindex(columns=rt_dummies_train.columns, fill_value=0)
+        
+        train_df = pd.concat([train_df, rt_dummies_train], axis=1)
+        test_df = pd.concat([test_df, rt_dummies_test], axis=1)
+        
+        features.extend(rt_dummies_train.columns.tolist())
+        # Remove original categorical column from features if we are using dummies
+        if 'room_type' in features:
+            features.remove('room_type')
+
+    # Label Encode remaining categoricals
     categorical_cols = train_df[features].select_dtypes(include=['object']).columns
     for col in categorical_cols:
         le = LabelEncoder()
@@ -183,6 +327,8 @@ def prepare_data_pipeline():
         le.fit(all_cats)
         train_df[col] = le.transform(train_df[col].astype(str))
         test_df[col] = le.transform(test_df[col].astype(str))
+        
+    print(f"Final Training Set Shape: {train_df[features].shape}")
         
     return (
         train_df[features], test_df[features],

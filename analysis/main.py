@@ -26,11 +26,12 @@ def run_full_analysis():
     
     # 3. Revenue Analysis
     rev_preds, r_low, r_high, rev_model = run_revenue_analysis(
-        trainer, X_train, y_train_rev, X_test, y_test_rev
+        trainer, X_train, y_train_rev, X_test, y_test_rev, test_df
     )
     
     # 4. Strategy Analysis
-    run_strategy_simulations(rev_model, X_test)
+    # Pass the actual model object, not the wrapper dict
+    run_strategy_simulations(rev_model['model'], X_test)
     
     # 5. Save Final Consolidated Results
     print("\n[Phase 5] Exporting Results")
