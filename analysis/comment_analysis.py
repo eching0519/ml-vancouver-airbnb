@@ -1,8 +1,13 @@
 import re
+import ast
 import numpy as np
 import pandas as pd
 from nltk.sentiment import SentimentIntensityAnalyzer
 from sklearn.feature_extraction.text import CountVectorizer
+
+# For the word chart (word cloud)
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
 
 # ---------------------------------------------------------
 # CONFIG: filenames & sampling
@@ -11,12 +16,6 @@ REVIEWS_CSV = "C:/Users/Dilsha/Desktop/Data Analytics/Capstone Project/Datasets/
 LISTINGS_XLSX = "C:/Users/Dilsha/Desktop/Data Analytics/Capstone Project/Datasets/listings-complete.xlsx"
 AMENITIES_SHEET = "Amenities_cleaned"   # sheet inside listings-complete.xlsx
 MAX_REVIEWS = 50000                     # set None for full dataset
-import re
-import ast
-import numpy as np
-import pandas as pd
-from nltk.sentiment import SentimentIntensityAnalyzer
-from sklearn.feature_extraction.text import CountVectorizer
 
 # ---------------------------------------------------------
 # 1. Setup VADER
@@ -269,6 +268,9 @@ print(f"Rows after filtering & deduplicating listing–amenity pairs: {len(ameni
 # ---------------------------------------------------------
 print("Step 10: computing amenity-level stats...")
 
+# total number of unique listings (for % calculation)
+total_listings = listings["id"].nunique()
+
 amenity_stats = (
     amenity_df
     .groupby("amenity")
@@ -284,18 +286,59 @@ amenity_stats = (
 # keep only amenities with enough listings
 amenity_stats = amenity_stats[amenity_stats["n_listings"] >= 10]
 
-# each amenity appears ONLY ONCE here
+# ➕ NEW: percentage of listings that have this amenity
+amenity_stats["percent_listings"] = (
+    amenity_stats["n_listings"] / total_listings * 100.0
+)
+
+# sort main table by percent of listings
+amenity_stats = amenity_stats[amenity_stats["percent_listings"] >= 30]
+
+# sort main table by percent of listings
+amenity_stats = amenity_stats.sort_values("percent_listings", ascending=False)
+
+# top 30 by different metrics
+top_by_share = amenity_stats.head(30)
 top_by_occupancy = amenity_stats.sort_values("avg_occupancy", ascending=False).head(30)
 top_by_revenue = amenity_stats.sort_values("avg_estimated_revenue", ascending=False).head(30)
 low_sentiment = amenity_stats.sort_values("avg_review_sentiment", ascending=True).head(30)
 
+print("\nTop 30 amenities by share of listings:")
+print(top_by_share[["amenity", "n_listings", "percent_listings"]])
+
 print("\nAmenities with highest average occupancy (unique amenities):")
-print(top_by_occupancy[["amenity", "n_listings", "avg_occupancy"]])
+print(top_by_occupancy[["amenity", "n_listings", "percent_listings", "avg_occupancy"]])
 
 print("\nAmenities with highest estimated revenue (unique amenities):")
-print(top_by_revenue[["amenity", "n_listings", "avg_estimated_revenue"]])
+print(top_by_revenue[["amenity", "n_listings", "percent_listings", "avg_estimated_revenue"]])
 
 print("\nAmenities with lowest (most negative) average review sentiment (unique amenities):")
-print(low_sentiment[["amenity", "n_listings", "avg_review_sentiment"]])
+print(low_sentiment[["amenity", "n_listings", "percent_listings", "avg_review_sentiment"]])
 
 print("\nAll done ✅")
+
+# ---------------------------------------------------------
+# 13. Word chart / word cloud based on amenities
+# ---------------------------------------------------------
+if amenity_stats.empty:
+    print("\nNo amenities to plot in word cloud (no ≥ 30% amenities).")
+else:
+    print("\nGenerating word cloud for amenities (weighted by percent_listings)...")
+
+    # Build frequency dict: amenity -> weight
+    freq = {
+        row["amenity"]: row["avg_occupancy"]
+        for _, row in amenity_stats.iterrows()
+    }
+
+    wordcloud = WordCloud(
+        width=1000,
+        height=500,
+        background_color="white"
+    ).generate_from_frequencies(freq)
+
+    plt.figure(figsize=(14, 7))
+    plt.imshow(wordcloud, interpolation="bilinear")
+    plt.axis("off")
+    plt.tight_layout()
+    plt.show()
