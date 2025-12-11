@@ -13,28 +13,20 @@ pd.set_option('future.no_silent_downcasting', True)
 
 
 def load_data_raw():
-    """
-    Loads raw data from the data directory.
-    """
-    # Assuming the script is run from project root or analysis/ folder
-    # Adjust path to find data relative to this file
+    """Loads raw data from the data directory."""
     current_dir = os.path.dirname(os.path.abspath(__file__))
     # Look for data in ../data/ relative to analysis/
     data_path = os.path.join(current_dir, '..', 'data', 'listings-detail.csv')
     
     if not os.path.exists(data_path):
-        # Fallback if running from root
         data_path = 'data/listings-detail.csv'
         
     print(f"Loading data from: {data_path}")
-    df = pd.read_csv(data_path)
-    return df
+    return pd.read_csv(data_path)
 
 def basic_cleaning(df):
-    """
-    Performs initial cleaning: boolean conversion, price parsing, and IQR outlier removal.
-    """
-    # 1. Boolean Conversion
+    """Performs initial cleaning: boolean conversion, price parsing, and IQR outlier removal."""
+    # Boolean Conversion
     boolean_columns = [
         'host_is_superhost', 'host_identity_verified',
         'has_availability', 'instant_bookable'
@@ -43,23 +35,21 @@ def basic_cleaning(df):
         if col in df.columns:
             df[col] = df[col].map({'t': True, 'f': False})
             
-    # 2. Price Cleaning
+    # Price Cleaning
     if 'price' in df.columns:
         df['price'] = df['price'].astype(str).str.replace('$', '').str.replace(',', '')
         df['price'] = pd.to_numeric(df['price'], errors='coerce')
         
-    # 3. Filter Missing Targets
+    # Filter Missing Targets
     df = df.dropna(subset=['price', 'estimated_revenue_l365d'])
     
-    # 4. IQR Outlier Filtering
-    # Price
+    # IQR Outlier Filtering
     Q1_price = df['price'].quantile(0.25)
     Q3_price = df['price'].quantile(0.75)
     IQR_price = Q3_price - Q1_price
     lower_price = Q1_price - 1.5 * IQR_price
     upper_price = Q3_price + 1.5 * IQR_price
     
-    # Revenue
     Q1_rev = df['estimated_revenue_l365d'].quantile(0.25)
     Q3_rev = df['estimated_revenue_l365d'].quantile(0.75)
     IQR_rev = Q3_rev - Q1_rev
@@ -71,9 +61,9 @@ def basic_cleaning(df):
         (df['price'] >= lower_price) & (df['price'] <= upper_price) &
         (df['estimated_revenue_l365d'] >= lower_rev) & (df['estimated_revenue_l365d'] <= upper_rev)
     ]
-    print(f"Data Cleaning: Removed {initial_len - len(df)} outliers based on IQR rules.")
+    print(f"Data Cleaning: Removed {initial_len - len(df)} outliers.")
     
-    # 5. Amenities Parsing
+    # Amenities Parsing
     def parse_amenities(amenities_str):
         if pd.isna(amenities_str) or amenities_str == '':
             return []
@@ -85,16 +75,37 @@ def basic_cleaning(df):
 
     df['amenities_list'] = df['amenities'].apply(parse_amenities)
     
-    top_amenities = [
-        'Wifi', 'Kitchen', 'Heating', 'Washer', 'Dryer', 'Air conditioning',
-        'Free parking on premises', 'Free street parking', 'Paid parking off premises',
-        'Hot tub', 'Pool', 'Gym', 'Pet-friendly', 'Business travel ready',
-        'Self check-in', 'Lockbox', 'Elevator', 'Balcony', 'Garden', 'BBQ grill'
-    ]
+    # Flexible Amenity Matching
+    amenity_mapping = {
+        'Wifi': ['wifi'],
+        'Kitchen': ['kitchen', 'kitchenette'],
+        'Heating': ['heating', 'indoor fireplace'],
+        'Washer': ['washer'],
+        'Dryer': ['dryer'],
+        'Air conditioning': ['air conditioning', 'central air conditioning'],
+        'Free parking': ['free parking', 'free driveway parking', 'free street parking', 'free residential garage'],
+        'Hot tub': ['hot tub', 'sauna'],
+        'Pool': ['pool'],
+        'Gym': ['gym', 'exercise equipment'],
+        'Pet-friendly': ['pets allowed', 'cat(s)', 'dog(s)'],
+        'Self check-in': ['self check-in', 'keypad', 'smart lock'],
+        'Lockbox': ['lockbox'],
+        'Elevator': ['elevator'],
+        'Balcony': ['balcony', 'patio', 'terrace'],
+        'Garden': ['garden', 'backyard'],
+        'BBQ grill': ['bbq', 'barbecue', 'grill'],
+        'Workspace': ['workspace', 'desk']
+    }
     
-    for amenity in top_amenities:
-        col_name = f'has_{amenity.lower().replace(" ", "_").replace("-", "_")}'
-        df[col_name] = df['amenities_list'].apply(lambda x: 1 if amenity in x else 0)
+    for label, keywords in amenity_mapping.items():
+        col_name = f'has_{label.lower().replace(" ", "_").replace("-", "_")}'
+        # Check if ANY keyword appears in ANY amenity string for that listing
+        df[col_name] = df['amenities_list'].apply(
+            lambda amenities: 1 if any(
+                any(k.lower() in a.lower() for k in keywords) 
+                for a in amenities
+            ) else 0
+        )
         
     # 6. Feature Engineering (Host & Dates)
     df['host_since'] = pd.to_datetime(df['host_since'], errors='coerce')
@@ -134,13 +145,17 @@ def prepare_data_pipeline():
         y_train_rev, y_test_rev
         test_df (Original test dataframe with metadata)
         features (List of feature names used)
+        df (Full cleaned DataFrame for comparative analysis)
     """
     # 1. Load & Clean
     df = load_data_raw()
     df = basic_cleaning(df)
+
+    # NEW: Extract Top 10% Revenue Listings for Basket Analysis
+    # We pass the full DF to basket analysis to allow comparison
+    # But we can still identify the threshold here for reference or just return the full DF
     
-    # 7. Text / NLP Features (Moved BEFORE split to ensure presence)
-    # Hypotheis: Certain keywords in Name/Description signal value (view, luxury, etc.)
+    # Text / NLP Features
     print("Extracting Text Features...")
     
     # Fill text NaNs
@@ -162,18 +177,17 @@ def prepare_data_pipeline():
     
     text_features = ['name_len', 'desc_len'] + [f'txt_{w}' for w in keywords]
     
-    # NEW: One-Hot Encoding for Neighborhoods (Keep original for stats)
-    # Using dtype=int to get 0/1 instead of True/False
+    # One-Hot Encoding for Neighborhoods
     nbhd_dummies = pd.get_dummies(df['neighbourhood_cleansed'], prefix='nbhd', dtype=int)
     df = pd.concat([df, nbhd_dummies], axis=1)
     
-    # 2. Split
+    # Split
     train_df, test_df = train_test_split(df, test_size=0.2, random_state=42)
     
-    # 3. Compute Stats (Train Only)
+    # Compute Stats (Train Only)
     stats = get_neighborhood_stats(train_df)
     
-    # 4. Merge Stats
+    # Merge Stats
     train_df = train_df.merge(stats, on='neighbourhood_cleansed', how='left')
     test_df = test_df.merge(stats, on='neighbourhood_cleansed', how='left')
     
@@ -256,8 +270,7 @@ def prepare_data_pipeline():
     features.append('people_per_bedroom')
     features.append('people_per_bath')
 
-    # 10. Target Encoding (Advanced Feature)
-    # Target: Price & Revenue, Feature: neighbourhood_cleansed & property_type
+    # Target Encoding
     print("Applying K-Fold Target Encoding...")
     
     target_encode_cols = ['neighbourhood_cleansed', 'property_type']
@@ -280,7 +293,7 @@ def prepare_data_pipeline():
             # Initialize with NaN
             train_df[new_col_name] = np.nan
             
-            # 1. Train Set: K-Fold to prevent leakage
+            # Train Set: K-Fold to prevent leakage
             for tr_ind, val_ind in kf.split(train_df):
                 X_tr, X_val = train_df.iloc[tr_ind], train_df.iloc[val_ind]
                 y_tr = target_vals.iloc[tr_ind]
@@ -295,27 +308,26 @@ def prepare_data_pipeline():
             global_mean = target_vals.mean()
             train_df[new_col_name] = train_df[new_col_name].fillna(global_mean)
             
-            # 2. Test Set: Map using full training set means
+            # Test Set: Map using full training set means
             full_means = pd.DataFrame({'cat': train_df[col], 'target': target_vals}).groupby('cat')['target'].mean()
             test_df[new_col_name] = test_df[col].map(full_means)
             test_df[new_col_name] = test_df[new_col_name].fillna(global_mean)
             
             features.append(new_col_name)
 
-    # 11. Encode Categoricals
-    # One-Hot Encode room_type for better distinction
+    # Encode Categoricals
+    # One-Hot Encode room_type
     if 'room_type' in train_df.columns:
         rt_dummies_train = pd.get_dummies(train_df['room_type'], prefix='rt', dtype=int)
         rt_dummies_test = pd.get_dummies(test_df['room_type'], prefix='rt', dtype=int)
         
-        # Align columns (in case test set is missing some room types)
+        # Align columns
         rt_dummies_test = rt_dummies_test.reindex(columns=rt_dummies_train.columns, fill_value=0)
         
         train_df = pd.concat([train_df, rt_dummies_train], axis=1)
         test_df = pd.concat([test_df, rt_dummies_test], axis=1)
         
         features.extend(rt_dummies_train.columns.tolist())
-        # Remove original categorical column from features if we are using dummies
         if 'room_type' in features:
             features.remove('room_type')
 
@@ -334,6 +346,7 @@ def prepare_data_pipeline():
         train_df[features], test_df[features],
         train_df['price'], test_df['price'],
         train_df['estimated_revenue_l365d'], test_df['estimated_revenue_l365d'],
-        test_df, features
+        test_df, features,
+        df
     )
 
