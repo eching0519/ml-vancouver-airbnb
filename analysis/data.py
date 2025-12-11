@@ -146,15 +146,14 @@ def prepare_data_pipeline():
         test_df (Original test dataframe with metadata)
         features (List of feature names used)
         df (Full cleaned DataFrame for comparative analysis)
+        metadata (Dictionary with stats/mappings for frontend inference)
     """
+    metadata = {}
+
     # 1. Load & Clean
     df = load_data_raw()
     df = basic_cleaning(df)
 
-    # NEW: Extract Top 10% Revenue Listings for Basket Analysis
-    # We pass the full DF to basket analysis to allow comparison
-    # But we can still identify the threshold here for reference or just return the full DF
-    
     # Text / NLP Features
     print("Extracting Text Features...")
     
@@ -187,6 +186,9 @@ def prepare_data_pipeline():
     # Compute Stats (Train Only)
     stats = get_neighborhood_stats(train_df)
     
+    # Save stats to metadata (convert to dict of dicts)
+    metadata['neighborhood_stats'] = stats.to_dict(orient='index')
+
     # Merge Stats
     train_df = train_df.merge(stats, on='neighbourhood_cleansed', how='left')
     test_df = test_df.merge(stats, on='neighbourhood_cleansed', how='left')
@@ -223,6 +225,7 @@ def prepare_data_pipeline():
         'review_scores_cleanliness', 'review_scores_value'
     ]
     
+    metadata['medians'] = {}
     for col in review_cols:
         if col in train_df.columns:
             # Create indicator flag
@@ -231,6 +234,9 @@ def prepare_data_pipeline():
             
             # Fill with median
             median_val = train_df[col].median()
+            # Save median to metadata
+            metadata['medians'][col] = float(median_val)
+
             train_df[col] = train_df[col].fillna(median_val)
             test_df[col] = test_df[col].fillna(median_val)
             
@@ -282,11 +288,14 @@ def prepare_data_pipeline():
     }
     
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
-    
+    metadata['target_encoding'] = {}
+
     for col in target_encode_cols:
         if col not in train_df.columns:
             continue
             
+        metadata['target_encoding'][col] = {}
+
         for target_name, target_vals in targets.items():
             new_col_name = f'TE_{target_name}_{col}'
             
@@ -315,6 +324,13 @@ def prepare_data_pipeline():
             
             features.append(new_col_name)
 
+            # Save mappings to metadata
+            # full_means is a Series, convert to dict
+            metadata['target_encoding'][col][target_name] = {
+                'map': full_means.to_dict(),
+                'global_mean': float(global_mean)
+            }
+
     # Encode Categoricals
     # One-Hot Encode room_type
     if 'room_type' in train_df.columns:
@@ -333,12 +349,18 @@ def prepare_data_pipeline():
 
     # Label Encode remaining categoricals
     categorical_cols = train_df[features].select_dtypes(include=['object']).columns
+    metadata['label_encoding'] = {}
+
     for col in categorical_cols:
         le = LabelEncoder()
         all_cats = pd.concat([train_df[col], test_df[col]]).astype(str).unique()
         le.fit(all_cats)
         train_df[col] = le.transform(train_df[col].astype(str))
         test_df[col] = le.transform(test_df[col].astype(str))
+        
+        # Save classes to metadata
+        # We need a mapping: string -> int
+        metadata['label_encoding'][col] = {label: int(i) for i, label in enumerate(le.classes_)}
         
     print(f"Final Training Set Shape: {train_df[features].shape}")
         
@@ -347,6 +369,6 @@ def prepare_data_pipeline():
         train_df['price'], test_df['price'],
         train_df['estimated_revenue_l365d'], test_df['estimated_revenue_l365d'],
         test_df, features,
-        df
+        df,
+        metadata
     )
-

@@ -6,6 +6,8 @@ kiwisolver==1.4.9
 lightgbm==4.6.0
 matplotlib==3.10.7
 numpy==2.2.6
+onnx==1.20.0
+onnxmltools==1.14.0
 packaging==25.0
 pandas==2.3.3
 pillow==12.0.0
@@ -16,6 +18,7 @@ scikit-learn==1.7.2
 scipy==1.15.3
 seaborn==0.13.2
 six==1.17.0
+skl2onnx==1.19.1
 threadpoolctl==3.6.0
 tzdata==2025.2
 xgboost==3.1.2
