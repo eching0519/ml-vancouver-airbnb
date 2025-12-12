@@ -7,7 +7,7 @@ import {
 } from "@/lib/inference";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, Resolver, useForm } from "react-hook-form";
 import * as yup from "yup";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -177,6 +177,35 @@ export default function PredictionForm() {
   // Watch all form values
   const formValues = watch();
 
+  // Memoize form values to prevent unnecessary re-renders
+  // Serialize to string for stable comparison
+  const formValuesString = useMemo(() => {
+    return JSON.stringify(formValues);
+  }, [
+    formValues.neighbourhood_cleansed,
+    formValues.room_type,
+    formValues.property_type,
+    formValues.accommodates,
+    formValues.bedrooms,
+    formValues.bathrooms,
+    formValues.beds,
+    formValues.latitude,
+    formValues.longitude,
+    formValues.amenities?.join(','),
+    formValues.name,
+    formValues.description,
+    formValues.instant_bookable,
+    formValues.host_is_superhost,
+    formValues.host_identity_verified,
+    formValues.host_experience_years,
+    formValues.availability_365,
+    formValues.reviews_per_month,
+    formValues.review_scores_rating,
+  ]);
+
+  // Track previous form values to prevent duplicate predictions
+  const prevFormValuesRef = useRef<string>("");
+
   // Test inference engine initialization on mount
   useEffect(() => {
     const testInit = async () => {
@@ -200,12 +229,23 @@ export default function PredictionForm() {
 
   // Update prediction on form change
   useEffect(() => {
+    // Skip if form values haven't actually changed
+    if (formValuesString === prevFormValuesRef.current) {
+      return;
+    }
+
+    // Update the ref
+    prevFormValuesRef.current = formValuesString;
+
+    // Capture current form values to avoid stale closure
+    const currentFormValues = formValues;
+
     const updatePrediction = async () => {
       // Check if required fields are filled
       if (
-        !formValues.neighbourhood_cleansed ||
-        !formValues.room_type ||
-        !formValues.property_type
+        !currentFormValues.neighbourhood_cleansed ||
+        !currentFormValues.room_type ||
+        !currentFormValues.property_type
       ) {
         return;
       }
@@ -215,7 +255,7 @@ export default function PredictionForm() {
       try {
         // Cast to PredictionFormData to ensure compatibility (optional text fields are handled)
         const prediction = await inferenceEngine.predict(
-          formValues as PredictionFormData
+          currentFormValues as PredictionFormData
         );
         setResult(prediction);
       } catch (e) {
@@ -232,7 +272,8 @@ export default function PredictionForm() {
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [formValues]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formValuesString]);
 
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
