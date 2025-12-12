@@ -74,14 +74,47 @@ export interface PredictionResult {
   };
 }
 
+// Global flag to ensure only one initialization across hot reloads
+let globalInferenceInitialized = false;
+let globalInitPromise: Promise<void> | null = null;
+
 export class InferenceEngine {
   private ort: any = null;
   private sessions: Record<string, any> = {};
   private initialized = false;
 
   async init() {
+    // Check global flag first (persists across hot reloads)
+    if (globalInferenceInitialized) {
+      this.initialized = true;
+      return;
+    }
+
+    // If global initialization is in progress, wait for it
+    if (globalInitPromise) {
+      await globalInitPromise;
+      this.initialized = true;
+      return;
+    }
+
+    // If already initialized locally, return
     if (this.initialized) return;
 
+    // Start global initialization
+    globalInitPromise = this._doInit();
+
+    try {
+      await globalInitPromise;
+      globalInferenceInitialized = true;
+      this.initialized = true;
+    } catch (e) {
+      // Clear global promise on failure to allow retry
+      globalInitPromise = null;
+      throw e;
+    }
+  }
+
+  private async _doInit(): Promise<void> {
     try {
       // Load ONNX runtime via dynamic import for better compatibility across hosting platforms
       this.ort = await import("onnxruntime-web");
@@ -425,16 +458,6 @@ export class InferenceEngine {
     }
   }
 
-  // Test initialization method for debugging
-  async testInit(): Promise<boolean> {
-    try {
-      await this.init();
-      return true;
-    } catch (e) {
-      console.error("Initialization test failed:", e);
-      return false;
-    }
-  }
 }
 
 export const inferenceEngine = new InferenceEngine();
