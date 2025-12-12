@@ -83,13 +83,9 @@ export class InferenceEngine {
     if (this.initialized) return;
 
     try {
-      // Check if ort is available globally (from script tag)
-      if (typeof (globalThis as any).ort !== "undefined") {
-        this.ort = (globalThis as any).ort;
-      } else {
-        // Fallback: try dynamic import
-        this.ort = await import("onnxruntime-web");
-      }
+      // Load ONNX runtime via dynamic import for better compatibility across hosting platforms
+      this.ort = await import("onnxruntime-web");
+      console.log("Loaded ONNX runtime via dynamic import");
 
       if (!this.ort) {
         throw new Error("ONNX Runtime could not be loaded");
@@ -100,13 +96,18 @@ export class InferenceEngine {
       this.ort.env.wasm.proxy = false;
       this.ort.env.logLevel = "error";
 
-      // Set WASM paths with explicit public folder path for better compatibility
-      this.ort.env.wasm.wasmPaths = {
-        "ort-wasm.wasm": "/ort-wasm.wasm",
-        "ort-wasm-simd.wasm": "/ort-wasm-simd.wasm",
-        "ort-wasm-threaded.wasm": "/ort-wasm-threaded.wasm",
-        "ort-wasm-simd-threaded.wasm": "/ort-wasm-simd-threaded.wasm",
-      };
+      // Configure WASM paths for deployment compatibility
+      // Try multiple approaches for better compatibility across hosting platforms
+      try {
+        this.ort.env.wasm.wasmPaths = {
+          "ort-wasm.wasm": "/ort-wasm.wasm",
+          "ort-wasm-simd.wasm": "/ort-wasm-simd.wasm",
+          "ort-wasm-threaded.wasm": "/ort-wasm-threaded.wasm",
+          "ort-wasm-simd-threaded.wasm": "/ort-wasm-simd-threaded.wasm",
+        };
+      } catch (wasmPathError) {
+        console.warn("Failed to set custom WASM paths, using defaults:", wasmPathError);
+      }
 
       const modelNames = [
         "Price_Point",
@@ -118,20 +119,30 @@ export class InferenceEngine {
       ];
 
       const promises = modelNames.map(async (name) => {
-        const url = `/models/${name}.onnx`;
-        const session = await this.ort.InferenceSession.create(url, {
-          executionProviders: ["wasm"],
-          logSeverityLevel: 3,
-          graphOptimizationLevel: "all", // Optimize for production
-        });
-        this.sessions[name] = session;
+        try {
+          const url = `/models/${name}.onnx`;
+          console.log(`Loading model: ${url}`);
+
+          const session = await this.ort.InferenceSession.create(url, {
+            executionProviders: ["wasm"],
+            logSeverityLevel: 3,
+            graphOptimizationLevel: "all", // Optimize for production
+          });
+
+          this.sessions[name] = session;
+          console.log(`Successfully loaded model: ${name}`);
+        } catch (modelError) {
+          console.error(`Failed to load model ${name}:`, modelError);
+          throw new Error(`Failed to load model ${name}: ${modelError instanceof Error ? modelError.message : String(modelError)}`);
+        }
       });
 
       await Promise.all(promises);
       this.initialized = true;
+      console.log("ONNX inference engine initialized successfully");
     } catch (e) {
       console.error("Failed to initialize ONNX sessions:", e);
-      throw e;
+      throw new Error(`Inference engine initialization failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -354,45 +365,75 @@ export class InferenceEngine {
   }
 
   async predict(data: PredictionFormData): Promise<PredictionResult> {
-    if (!this.initialized) await this.init();
+    try {
+      if (!this.initialized) {
+        console.log("Initializing inference engine...");
+        await this.init();
+      }
 
-    const feats = this.prepareFeatures(data);
+      console.log("Preparing features...");
+      const feats = this.prepareFeatures(data);
 
-    // Create Tensor
-    const tensor = new this.ort.Tensor("float32", feats, [1, feats.length]);
-    const feeds = { float_input: tensor }; // 'float_input' is the name defined in main.py export
+      // Create Tensor
+      const tensor = new this.ort.Tensor("float32", feats, [1, feats.length]);
+      const feeds = { float_input: tensor }; // 'float_input' is the name defined in main.py export
 
-    // Run Inference
-    // Price
-    const pPoint = await this.sessions["Price_Point"].run(feeds);
-    const pLower = await this.sessions["Price_Lower_q5"].run(feeds);
-    const pUpper = await this.sessions["Price_Upper_q95"].run(feeds);
+      console.log("Running inference...");
 
-    // Revenue
-    const rPoint = await this.sessions["Revenue_Point"].run(feeds);
-    const rLower = await this.sessions["Revenue_Lower_q5"].run(feeds);
-    const rUpper = await this.sessions["Revenue_Upper_q95"].run(feeds);
+      // Run Inference
+      // Price
+      const [pPoint, pLower, pUpper] = await Promise.all([
+        this.sessions["Price_Point"].run(feeds),
+        this.sessions["Price_Lower_q5"].run(feeds),
+        this.sessions["Price_Upper_q95"].run(feeds),
+      ]);
 
-    // Extract values (output name is usually 'variable' or similar, check map or index 0)
-    // LightGBM ONNX export usually outputs 'label' or 'variable'.
-    // Let's check the result object keys or just use values().next().value
-    const getVal = (res: Record<string, any>) => {
-      const val = res[Object.keys(res)[0]].data as Float32Array;
-      return val[0];
-    };
+      // Revenue
+      const [rPoint, rLower, rUpper] = await Promise.all([
+        this.sessions["Revenue_Point"].run(feeds),
+        this.sessions["Revenue_Lower_q5"].run(feeds),
+        this.sessions["Revenue_Upper_q95"].run(feeds),
+      ]);
 
-    return {
-      price: {
-        point: Math.round(Math.expm1(getVal(pPoint))),
-        lower: Math.round(getVal(pLower)),
-        upper: Math.round(getVal(pUpper)),
-      },
-      revenue: {
-        point: Math.round(getVal(rPoint)),
-        lower: Math.round(getVal(rLower)),
-        upper: Math.round(getVal(rUpper)),
-      },
-    };
+      // Extract values (output name is usually 'variable' or similar, check map or index 0)
+      // LightGBM ONNX export usually outputs 'label' or 'variable'.
+      // Let's check the result object keys or just use values().next().value
+      const getVal = (res: Record<string, any>) => {
+        const val = res[Object.keys(res)[0]].data as Float32Array;
+        return val[0];
+      };
+
+      const result = {
+        price: {
+          point: Math.round(Math.expm1(getVal(pPoint))),
+          lower: Math.round(getVal(pLower)),
+          upper: Math.round(getVal(pUpper)),
+        },
+        revenue: {
+          point: Math.round(getVal(rPoint)),
+          lower: Math.round(getVal(rLower)),
+          upper: Math.round(getVal(rUpper)),
+        },
+      };
+
+      console.log("Prediction completed successfully:", result);
+      return result;
+
+    } catch (e) {
+      console.error("Prediction failed:", e);
+      throw new Error(`Prediction failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  // Test initialization method for debugging
+  async testInit(): Promise<boolean> {
+    try {
+      await this.init();
+      return true;
+    } catch (e) {
+      console.error("Initialization test failed:", e);
+      return false;
+    }
   }
 }
 

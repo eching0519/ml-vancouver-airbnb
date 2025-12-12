@@ -177,6 +177,27 @@ export default function PredictionForm() {
   // Watch all form values
   const formValues = watch();
 
+  // Test inference engine initialization on mount
+  useEffect(() => {
+    const testInit = async () => {
+      try {
+        console.log("Testing inference engine initialization...");
+        const success = await inferenceEngine.testInit();
+        if (success) {
+          console.log("Inference engine initialized successfully");
+        } else {
+          console.error("Inference engine initialization failed");
+          setError("Failed to initialize prediction models. Please check your connection and try refreshing the page.");
+        }
+      } catch (e) {
+        console.error("Inference engine test failed:", e);
+        setError(`Failed to load prediction models: ${e instanceof Error ? e.message : "Please check your browser console for details."}`);
+      }
+    };
+
+    testInit();
+  }, []);
+
   // Update prediction on form change
   useEffect(() => {
     const updatePrediction = async () => {
@@ -198,8 +219,8 @@ export default function PredictionForm() {
         );
         setResult(prediction);
       } catch (e) {
-        console.error(e);
-        setError("Failed to run prediction. Please ensure models are loaded.");
+        console.error("Prediction error:", e);
+        setError(`Failed to run prediction: ${e instanceof Error ? e.message : "Please ensure models are loaded."}`);
       } finally {
         setLoading(false);
       }
