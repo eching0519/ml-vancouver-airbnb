@@ -1,23 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Headers are now handled by middleware.ts to avoid conflicts with Next.js internal routes
   async headers() {
     return [
       {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
-          },
-          {
-            key: 'Cross-Origin-Embedder-Policy',
-            value: 'require-corp',
-          },
-        ],
-      },
-      {
-        source: '/(.*).mjs',
+        // Set Content-Type headers for .mjs files (middleware handles CORP)
+        source: '/:path*.mjs',
         headers: [
           {
             key: 'Content-Type',
@@ -26,7 +15,8 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: '/(.*).wasm',
+        // Set Content-Type headers for .wasm files (middleware handles CORP)
+        source: '/:path*.wasm',
         headers: [
           {
             key: 'Content-Type',
