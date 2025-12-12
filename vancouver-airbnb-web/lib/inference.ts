@@ -66,11 +66,13 @@ export interface PredictionResult {
     point: number;
     lower: number;
     upper: number;
+    distribution: Record<string, number>;
   };
   revenue: {
     point: number;
     lower: number;
     upper: number;
+    distribution: Record<string, number>;
   };
 }
 
@@ -130,7 +132,6 @@ export class InferenceEngine {
       this.ort.env.logLevel = "error";
 
       // Configure WASM paths for deployment compatibility
-      // Try multiple approaches for better compatibility across hosting platforms
       try {
         this.ort.env.wasm.wasmPaths = {
           "ort-wasm.wasm": "/ort-wasm.wasm",
@@ -142,14 +143,7 @@ export class InferenceEngine {
         console.warn("Failed to set custom WASM paths, using defaults:", wasmPathError);
       }
 
-      const modelNames = [
-        "Price_Point",
-        "Price_Lower_q5",
-        "Price_Upper_q95",
-        "Revenue_Point",
-        "Revenue_Lower_q5",
-        "Revenue_Upper_q95",
-      ];
+      const modelNames = ["Price_Model", "Revenue_Model"];
 
       const promises = modelNames.map(async (name) => {
         try {
@@ -415,38 +409,102 @@ export class InferenceEngine {
 
       // Run Inference
       // Price
-      const [pPoint, pLower, pUpper] = await Promise.all([
-        this.sessions["Price_Point"].run(feeds),
-        this.sessions["Price_Lower_q5"].run(feeds),
-        this.sessions["Price_Upper_q95"].run(feeds),
-      ]);
+      const priceResults = await this.sessions["Price_Model"].run(feeds);
 
       // Revenue
-      const [rPoint, rLower, rUpper] = await Promise.all([
-        this.sessions["Revenue_Point"].run(feeds),
-        this.sessions["Revenue_Lower_q5"].run(feeds),
-        this.sessions["Revenue_Upper_q95"].run(feeds),
-      ]);
+      const revenueResults = await this.sessions["Revenue_Model"].run(feeds);
 
-      // Extract values (output name is usually 'variable' or similar, check map or index 0)
-      // LightGBM ONNX export usually outputs 'label' or 'variable'.
-      // Let's check the result object keys or just use values().next().value
-      const getVal = (res: Record<string, any>) => {
-        const val = res[Object.keys(res)[0]].data as Float32Array;
+      // Helper to extract value from tensor
+      const getVal = (tensor: any) => {
+        const val = tensor.data as Float32Array;
         return val[0];
       };
 
+      const processResults = (results: Record<string, any>, prefix: string, isLogPoint: boolean) => {
+        const distribution: Record<string, number> = {};
+        let point = 0;
+        let lower = 0;
+        let upper = 0;
+
+        // 1. Extract raw values
+        const quantiles: { p: number; val: number }[] = [];
+
+        Object.keys(results).forEach((key) => {
+          if (!key.includes(prefix)) return;
+
+          const rawVal = getVal(results[key]);
+          let finalVal = rawVal;
+
+          // Apply inverse transform ONLY for Point if isLogPoint is true.
+          // Quantile models were trained on linear target, so no transform needed.
+          if (key.includes("Point") && isLogPoint) {
+            finalVal = Math.expm1(rawVal);
+          }
+
+          finalVal = Math.round(finalVal);
+
+          if (key.includes("Point")) {
+            // Point estimate
+            // Handle duplicates if any (last one wins)
+            distribution["Point"] = finalVal;
+            point = finalVal;
+          } else {
+            // Quantiles
+            const match = key.match(/q(\d+)/);
+            if (match) {
+              const p = parseInt(match[1]);
+              // Store for sorting/smoothing later
+              // We might have duplicates (e.g. Price_Lower_q5 vs Price_q5). 
+              // We'll push all and dedup by p later or just let sort handle it?
+              // Better to use a map to dedup first.
+            }
+          }
+        });
+
+        // 2. Dedup and Collect Quantiles
+        const qMap = new Map<number, number>();
+        Object.keys(results).forEach((key) => {
+          if (!key.includes(prefix)) return;
+          
+          let val = getVal(results[key]);
+          // Only Point is log-transformed in our training setup
+          if (key.includes("Point")) {
+            if (isLogPoint) val = Math.expm1(val);
+             distribution["Point"] = Math.round(val);
+             point = Math.round(val);
+             return;
+          }
+
+          // Quantiles (linear)
+          const match = key.match(/q(\d+)/);
+          if (match) {
+             const p = parseInt(match[1]);
+             qMap.set(p, Math.round(val));
+          }
+        });
+
+        // 3. Enforce Monotonicity (Fix crossing quantiles)
+        // Extract p and val
+        const sortedPs = Array.from(qMap.keys()).sort((a, b) => a - b);
+        const values = sortedPs.map(p => qMap.get(p)!);
+        
+        // Sort values to enforce q_low <= q_high (Rearrangement)
+        values.sort((a, b) => a - b);
+
+        // 4. Re-assign to distribution
+        sortedPs.forEach((p, i) => {
+            const val = values[i];
+            distribution[`q${p}`] = val;
+            if (p === 5) lower = val;
+            if (p === 95) upper = val;
+        });
+
+        return { point, lower, upper, distribution };
+      };
+
       const result = {
-        price: {
-          point: Math.round(Math.expm1(getVal(pPoint))),
-          lower: Math.round(getVal(pLower)),
-          upper: Math.round(getVal(pUpper)),
-        },
-        revenue: {
-          point: Math.round(getVal(rPoint)),
-          lower: Math.round(getVal(rLower)),
-          upper: Math.round(getVal(rUpper)),
-        },
+        price: processResults(priceResults, "Price", true), // Price Point is log-transformed
+        revenue: processResults(revenueResults, "Revenue", false), // Revenue Point is linear
       };
 
       console.log("Prediction completed successfully:", result);

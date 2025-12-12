@@ -10,12 +10,17 @@ def run_price_analysis(trainer, X_train, y_train_price, X_test, y_test_price, te
     price_model = trainer.train_point_estimator(X_train, y_train_price, "Price_Point", log_transform=True)
     price_preds, _, _ = trainer.evaluate(price_model, X_test, y_test_price, "Price Model")
     
-    # Interval Estimate (5th and 95th percentiles)
-    price_low = trainer.train_quantile_estimator(X_train, y_train_price, 0.05, "Price_Lower")
-    price_high = trainer.train_quantile_estimator(X_train, y_train_price, 0.95, "Price_Upper")
+    # Interval Estimate (Train all quantiles for detailed distribution)
+    trainer.train_quantiles_range(X_train, y_train_price, "Price_Lower") # Naming convention: Price_Lower_q5 ...
+    # Actually, let's use a cleaner prefix since it's the whole distribution
+    trainer.train_quantiles_range(X_train, y_train_price, "Price")
     
-    p_low_preds = price_low['model'].predict(X_test)
-    p_high_preds = price_high['model'].predict(X_test)
+    # Retrieve 5th and 95th for legacy support and coverage calc
+    price_low_model = trainer.models["Price_q5"]['model']
+    price_high_model = trainer.models["Price_q95"]['model']
+    
+    p_low_preds = price_low_model.predict(X_test)
+    p_high_preds = price_high_model.predict(X_test)
     
     # Ensure logical ordering (Low <= Pred <= High)
     stacked_preds = np.vstack((p_low_preds, price_preds, p_high_preds)).T

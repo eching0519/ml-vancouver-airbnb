@@ -10,12 +10,15 @@ def run_revenue_analysis(trainer, X_train, y_train_rev, X_test, y_test_rev, test
     rev_model = trainer.train_point_estimator(X_train, y_train_rev, "Revenue_Point", log_transform=False)
     rev_preds, _, _ = trainer.evaluate(rev_model, X_test, y_test_rev, "Revenue Model")
     
-    # Interval Estimate
-    rev_low = trainer.train_quantile_estimator(X_train, y_train_rev, 0.05, "Revenue_Lower")
-    rev_high = trainer.train_quantile_estimator(X_train, y_train_rev, 0.95, "Revenue_Upper")
+    # Interval Estimate (Train all quantiles)
+    trainer.train_quantiles_range(X_train, y_train_rev, "Revenue")
     
-    r_low_preds = rev_low['model'].predict(X_test)
-    r_high_preds = rev_high['model'].predict(X_test)
+    # Retrieve 5th and 95th for legacy support
+    rev_low_model = trainer.models["Revenue_q5"]['model']
+    rev_high_model = trainer.models["Revenue_q95"]['model']
+    
+    r_low_preds = rev_low_model.predict(X_test)
+    r_high_preds = rev_high_model.predict(X_test)
     
     # Ensure logical ordering
     stacked_preds = np.vstack((r_low_preds, rev_preds, r_high_preds)).T

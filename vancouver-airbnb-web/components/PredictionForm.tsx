@@ -6,7 +6,8 @@ import {
   PredictionResult,
 } from "@/lib/inference";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { BarChart2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, Resolver, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -139,10 +140,94 @@ const schema = yup.object({
 // Use PredictionFormData as the base type to ensure compatibility
 type FormData = PredictionFormData;
 
+// --- Helper Components ---
+
+const DistributionChart = ({
+  data,
+  colorClass,
+  label,
+  hideLabel = false,
+}: {
+  data: Record<string, number>;
+  colorClass: string;
+  label: string;
+  hideLabel?: boolean;
+}) => {
+  // Extract and sort percentiles
+  const percentiles = Object.keys(data)
+    .filter((k) => k.startsWith("q"))
+    .map((k) => parseInt(k.substring(1)))
+    .sort((a, b) => a - b);
+
+  if (percentiles.length === 0) return null;
+
+  const values = percentiles.map((p) => data[`q${p}`]);
+  const maxVal = Math.max(...values);
+  const minVal = Math.min(...values); // Could be negative for revenue
+
+  // Calculate range for normalization
+  // We want to handle negative values if they exist (Revenue)
+  // Simple approach: map min..max to 0..100%
+  const range = maxVal - Math.min(0, minVal);
+
+  return (
+    <div className="mt-4">
+      {!hideLabel && (
+        <p className="text-xs text-slate-400 mb-2 text-left">
+          {label} Distribution
+        </p>
+      )}
+      <div className="flex items-end space-x-1 h-32 w-full">
+        {percentiles.map((p) => {
+          const val = data[`q${p}`];
+          // Top X% = 100 - p
+          const topPercent = 100 - p;
+          
+          // Normalize height. If val is negative, we might want to show it differently,
+          // but for simplicity let's just clamp to 0 for height and maybe use color to indicate?
+          // Actually, let's just make it relative to max.
+          // If val < 0, height = 0? Or maybe a small bar going down?
+          // Let's assume mostly positive for Price. Revenue might be negative.
+          
+          const heightPercent = Math.max(5, (Math.abs(val) / Math.max(Math.abs(maxVal), Math.abs(minVal))) * 100);
+          
+          return (
+            <div
+              key={p}
+              className="flex-1 group relative flex flex-col justify-end h-full"
+            >
+              <div
+                className={`w-full rounded-t ${colorClass} ${
+                  val < 0 ? "opacity-30 bg-red-500" : "opacity-60"
+                } group-hover:opacity-100 transition-all cursor-pointer`}
+                style={{ height: `${heightPercent}%` }}
+              />
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-max bg-slate-950 text-white text-xs p-2 rounded shadow-xl z-20 pointer-events-none border border-slate-700">
+                <p className="font-bold text-slate-200">Top {topPercent}% Performer</p>
+                <p className={`text-sm ${val < 0 ? "text-red-400" : "text-white"}`}>
+                  ${val.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between text-[10px] text-slate-500 mt-1 px-1">
+        <span>Top 95%</span>
+        <span>Top 5%</span>
+      </div>
+    </div>
+  );
+};
+
 export default function PredictionForm() {
   const [result, setResult] = useState<PredictionResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeChart, setActiveChart] = useState<"price" | "revenue" | null>(
+    null
+  );
 
   const {
     register,
@@ -676,12 +761,18 @@ export default function PredictionForm() {
                   <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
                     ${result.price.point}
                   </p>
-                  <p className="text-slate-400 text-xs md:text-sm mb-1">
-                    Range: ${result.price.lower} - ${result.price.upper}
-                  </p>
-                  <p className="text-slate-500 text-xs italic">
-                    Lower: conservative (5th percentile) • Upper: top 5% performers (95th percentile)
-                  </p>
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <p className="text-slate-400 text-xs md:text-sm">
+                      Range: ${result.price.lower} - ${result.price.upper}
+                    </p>
+                    <button
+                      onClick={() => setActiveChart("price")}
+                      className="p-1 hover:bg-slate-700 rounded-full transition-colors"
+                      title="View Distribution"
+                    >
+                      <BarChart2 className="w-4 h-4 text-slate-400 hover:text-blue-400" />
+                    </button>
+                  </div>
                 </div>
                 <div className="p-3 md:p-6 bg-slate-800 rounded-lg">
                   <p className="text-green-400 font-medium mb-1 md:mb-2 text-xs md:text-base">
@@ -690,19 +781,76 @@ export default function PredictionForm() {
                   <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
                     ${result.revenue.point.toLocaleString()}
                   </p>
-                  <p className="text-slate-400 text-xs md:text-sm mb-1">
-                    Range: ${result.revenue.lower.toLocaleString()} - $
-                    {result.revenue.upper.toLocaleString()}
-                  </p>
-                  <p className="text-slate-500 text-xs italic">
-                    Lower: conservative (5th percentile) • Upper: top 5% performers (95th percentile)
-                  </p>
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <p className="text-slate-400 text-xs md:text-sm">
+                      Range: ${result.revenue.lower.toLocaleString()} - $
+                      {result.revenue.upper.toLocaleString()}
+                    </p>
+                    <button
+                      onClick={() => setActiveChart("revenue")}
+                      className="p-1 hover:bg-slate-700 rounded-full transition-colors"
+                      title="View Distribution"
+                    >
+                      <BarChart2 className="w-4 h-4 text-slate-400 hover:text-green-400" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </>
           )}
         </div>
       </motion.div>
+
+      {/* Chart Modal */}
+      <AnimatePresence>
+        {result && activeChart && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+            onClick={() => setActiveChart(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-900 border border-slate-700 p-6 rounded-xl max-w-lg w-full shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setActiveChart(null)}
+                className="absolute top-4 right-4 p-1 hover:bg-slate-800 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400 hover:text-white" />
+              </button>
+
+              <h3 className="text-xl font-bold text-white mb-6">
+                {activeChart === "price"
+                  ? "Price Distribution"
+                  : "Revenue Distribution"}
+              </h3>
+
+              {activeChart === "price" && (
+                <DistributionChart
+                  data={result.price.distribution}
+                  colorClass="bg-blue-500"
+                  label="Price"
+                  hideLabel
+                />
+              )}
+              {activeChart === "revenue" && (
+                <DistributionChart
+                  data={result.revenue.distribution}
+                  colorClass="bg-green-500"
+                  label="Revenue"
+                  hideLabel
+                />
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
