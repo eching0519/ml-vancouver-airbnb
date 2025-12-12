@@ -40,7 +40,11 @@ class ModelTrainer:
         
     def train_quantile_estimator(self, X_train, y_train, alpha, name="quantile_model"):
         """Trains a LightGBM Quantile Regressor"""
-        print(f"Training {name} (Quantile: {alpha})...")
+        q_suffix = f"_q{int(alpha*100)}"
+        # Append suffix if not present to ensure uniqueness in trainer.models keys
+        full_name = name if name.endswith(q_suffix) else f"{name}{q_suffix}"
+        
+        print(f"Training {full_name} (Quantile: {alpha})...")
         model = lgb.LGBMRegressor(
             objective='quantile',
             alpha=alpha,
@@ -54,8 +58,18 @@ class ModelTrainer:
             colsample_bytree=0.8
         )
         model.fit(X_train, y_train)
-        self.models[f"{name}_q{int(alpha*100)}"] = {'model': model, 'log_transform': False}
+        self.models[full_name] = {'model': model, 'log_transform': False}
         return {'model': model, 'log_transform': False}
+
+    def train_quantiles_range(self, X_train, y_train, name_prefix="quantile_model"):
+        """Trains LightGBM Quantile Regressors for every 5% percentile"""
+        quantiles = np.arange(0.05, 1.0, 0.05)
+        results = {}
+        for q in quantiles:
+            # Avoid re-training if exact same call
+            q = float(f"{q:.2f}") # Avoid floating point precision issues
+            self.train_quantile_estimator(X_train, y_train, q, name_prefix)
+        return self.models
 
     def evaluate(self, model_wrapper, X_test, y_test, metric_prefix="Model"):
         model = model_wrapper['model']
