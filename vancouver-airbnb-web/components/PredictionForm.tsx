@@ -676,8 +676,11 @@ export default function PredictionForm() {
                   <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
                     ${result.price.point}
                   </p>
-                  <p className="text-slate-400 text-xs md:text-sm">
+                  <p className="text-slate-400 text-xs md:text-sm mb-1">
                     Range: ${result.price.lower} - ${result.price.upper}
+                  </p>
+                  <p className="text-slate-500 text-xs italic">
+                    Lower: conservative (5th percentile) • Upper: top 5% performers (95th percentile)
                   </p>
                 </div>
                 <div className="p-3 md:p-6 bg-slate-800 rounded-lg">
@@ -687,9 +690,12 @@ export default function PredictionForm() {
                   <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
                     ${result.revenue.point.toLocaleString()}
                   </p>
-                  <p className="text-slate-400 text-xs md:text-sm">
+                  <p className="text-slate-400 text-xs md:text-sm mb-1">
                     Range: ${result.revenue.lower.toLocaleString()} - $
                     {result.revenue.upper.toLocaleString()}
+                  </p>
+                  <p className="text-slate-500 text-xs italic">
+                    Lower: conservative (5th percentile) • Upper: top 5% performers (95th percentile)
                   </p>
                 </div>
               </div>
