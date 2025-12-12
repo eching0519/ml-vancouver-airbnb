@@ -1,12 +1,13 @@
 "use client";
 
-import type {
+import {
+  inferenceEngine,
   PredictionFormData,
   PredictionResult,
-} from "@/app/api/predict/route";
+} from "@/lib/inference";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { motion } from "framer-motion";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, Resolver, useForm } from "react-hook-form";
 import * as yup from "yup";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -176,64 +177,29 @@ export default function PredictionForm() {
   // Watch all form values
   const formValues = watch();
 
-  // Serialize form values to detect actual changes (normalize arrays for comparison)
-  const normalizedFormValues = useMemo(() => {
-    return {
-      ...formValues,
-      amenities: [...(formValues.amenities || [])].sort(),
-    };
-  }, [formValues]);
-
-  const formValuesString = useMemo(
-    () => JSON.stringify(normalizedFormValues),
-    [normalizedFormValues]
-  );
-
-  // Track previous form values to prevent unnecessary API calls
-  const previousFormValuesRef = useRef<string>("");
-
   // Update prediction on form change
   useEffect(() => {
-    // Skip if form values haven't actually changed
-    if (formValuesString === previousFormValuesRef.current) {
-      return;
-    }
-
-    // Check if required fields are filled
-    if (
-      !formValues.neighbourhood_cleansed ||
-      !formValues.room_type ||
-      !formValues.property_type
-    ) {
-      previousFormValuesRef.current = formValuesString;
-      return;
-    }
-
-    // Update the ref to track this as the new previous value
-    previousFormValuesRef.current = formValuesString;
-
     const updatePrediction = async () => {
+      // Check if required fields are filled
+      if (
+        !formValues.neighbourhood_cleansed ||
+        !formValues.room_type ||
+        !formValues.property_type
+      ) {
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
-        // Call the API for prediction
-        const response = await fetch("/api/predict", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formValues as PredictionFormData),
-        });
-
-        if (!response.ok) {
-          throw new Error(`API request failed: ${response.status}`);
-        }
-
-        const prediction: PredictionResult = await response.json();
+        // Cast to PredictionFormData to ensure compatibility (optional text fields are handled)
+        const prediction = await inferenceEngine.predict(
+          formValues as PredictionFormData
+        );
         setResult(prediction);
       } catch (e) {
         console.error(e);
-        setError("Failed to run prediction. Please try again.");
+        setError("Failed to run prediction. Please ensure models are loaded.");
       } finally {
         setLoading(false);
       }
@@ -245,7 +211,7 @@ export default function PredictionForm() {
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [formValuesString, formValues]);
+  }, [formValues]);
 
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
