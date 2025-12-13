@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import * as ort from "onnxruntime-web";
 import metadata from "./models_metadata.json";
 
-// Configure ONNX Runtime to look for wasm files in public folder
-// Moved to init to ensure proper loading
+// Configure ONNX Runtime for web
+ort.env.wasm.numThreads = 1; // Use single thread for better compatibility
 
 interface NeighborhoodStats {
   neighborhood_price_mean: number;

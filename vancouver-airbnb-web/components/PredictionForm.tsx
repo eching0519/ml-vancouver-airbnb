@@ -1,7 +1,11 @@
 "use client";
 
-import { NeighbourhoodGeoJSON, getNeighbourhoodCentroid } from "@/lib/geoUtils";
-import { PredictionFormData, PredictionResult } from "@/lib/inference";
+import { getNeighbourhoodCentroid, NeighbourhoodGeoJSON } from "@/lib/geoUtils";
+import {
+  inferenceEngine,
+  PredictionFormData,
+  PredictionResult,
+} from "@/lib/inference";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { motion } from "framer-motion";
 import { ChartColumnBig, ChevronDown, ChevronUp } from "lucide-react";
@@ -387,21 +391,10 @@ export default function PredictionForm() {
       setLoading(true);
       setError(null);
       try {
-        // Call the API for prediction
-        const response = await fetch("/api/predict", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(currentFormValues as PredictionFormData),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Prediction failed");
-        }
-
-        const prediction: PredictionResult = await response.json();
+        // Cast to PredictionFormData to ensure compatibility (optional text fields are handled)
+        const prediction = await inferenceEngine.predict(
+          currentFormValues as PredictionFormData
+        );
         setResult(prediction);
         // Auto-expand panel when results arrive
         setIsResultsPanelOpen(true);
@@ -925,32 +918,11 @@ export default function PredictionForm() {
                     </Alert>
                   )}
                   {loading && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
-                      <Card className="bg-card border-border text-center min-h-[140px] md:min-h-[180px]">
-                        <CardContent className="p-3 md:p-6 h-full flex items-center justify-center">
-                          <div className="animate-pulse space-y-3 w-full">
-                            <div className="h-4 bg-muted rounded w-3/4 mx-auto"></div>
-                            <div className="h-12 bg-muted rounded w-1/2 mx-auto"></div>
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="h-4 bg-muted rounded flex-1"></div>
-                              <div className="h-8 w-8 bg-muted rounded shrink-0"></div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card className="bg-card border-border text-center min-h-[140px] md:min-h-[180px]">
-                        <CardContent className="p-3 md:p-6 h-full flex items-center justify-center">
-                          <div className="animate-pulse space-y-3 w-full">
-                            <div className="h-4 bg-muted rounded w-3/4 mx-auto"></div>
-                            <div className="h-12 bg-muted rounded w-1/2 mx-auto"></div>
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="h-4 bg-muted rounded flex-1"></div>
-                              <div className="h-8 w-8 bg-muted rounded shrink-0"></div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
+                    <Alert className="bg-card border-border text-card-foreground">
+                      <AlertDescription className="text-sm md:text-lg text-center">
+                        Analyzing...
+                      </AlertDescription>
+                    </Alert>
                   )}
                   {error && (
                     <Alert
