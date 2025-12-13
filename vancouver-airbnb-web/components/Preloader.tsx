@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 
 export default function Preloader() {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
       <div className="text-center">
         <motion.div
           className="mb-8"
@@ -13,7 +13,7 @@ export default function Preloader() {
           transition={{ duration: 0.3 }}
         >
           <motion.div
-            className="mx-auto mb-4 h-16 w-16 rounded-full border-4 border-slate-200 border-t-blue-600"
+            className="mx-auto mb-4 h-16 w-16 rounded-full border-4 border-muted border-t-primary"
             animate={{ rotate: 360 }}
             transition={{
               duration: 1,
@@ -23,7 +23,7 @@ export default function Preloader() {
           />
         </motion.div>
         <motion.p
-          className="text-lg font-semibold text-slate-700"
+          className="text-lg font-semibold text-foreground"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
@@ -31,7 +31,7 @@ export default function Preloader() {
           Initializing ONNX Inference Engine...
         </motion.p>
         <motion.p
-          className="mt-2 text-sm text-slate-500"
+          className="mt-2 text-sm text-muted-foreground"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
@@ -42,4 +42,3 @@ export default function Preloader() {
     </div>
   );
 }
-
