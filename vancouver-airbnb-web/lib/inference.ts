@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import * as ort from "onnxruntime-web";
 import metadata from "./models_metadata.json";
 
-// Configure ONNX Runtime for web
-ort.env.wasm.numThreads = 1; // Use single thread for better compatibility
+// Configure ONNX Runtime to look for wasm files in public folder
+// Moved to init to ensure proper loading
 
 interface NeighborhoodStats {
   neighborhood_price_mean: number;
@@ -99,9 +98,9 @@ export interface PredictionFormData {
   longitude: number;
   amenities: string[];
 
-  // Optional Text Fields (character counts - will default to 0 if not provided)
-  name?: number;
-  description?: number;
+  // Optional Text Fields (will default to empty if not provided)
+  name?: string;
+  description?: string;
 
   // Price Strategy Inputs
   instant_bookable: boolean;
@@ -410,14 +409,12 @@ export class InferenceEngine {
     }
 
     // 7. Text Features
-    // name and description are now character counts (numbers)
-    const nameLen = data.name ?? medians["name_len"] ?? 20;
-    const descLen = data.description ?? medians["desc_len"] ?? 100;
+    const name = data.name || "";
+    const desc = data.description || "";
 
-    setF("name_len", nameLen);
-    setF("desc_len", descLen);
+    setF("name_len", name.length || medians["name_len"] || 20); // Fallback
+    setF("desc_len", desc.length || medians["desc_len"] || 100);
 
-    // Keyword features are set to 0 since we only have character counts, not actual text
     const keywords = [
       "view",
       "luxury",
@@ -430,7 +427,9 @@ export class InferenceEngine {
       "spacious",
     ];
     keywords.forEach((k) => {
-      setF(`txt_${k}`, 0);
+      const hasKw =
+        this.getKeywordFeature(name, k) || this.getKeywordFeature(desc, k);
+      setF(`txt_${k}`, hasKw);
     });
 
     // 8. Computed Features
