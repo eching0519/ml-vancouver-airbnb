@@ -7,7 +7,7 @@ import {
 } from "@/lib/inference";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { motion } from "framer-motion";
-import { ChartColumnBig, ChevronDown, ChevronUp } from "lucide-react";
+import { BarChart2, ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, Resolver, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -148,9 +148,9 @@ const schema = yup.object({
   longitude: yup.number().required().typeError("Must be a number"),
   amenities: yup.array().of(yup.string()).required(),
 
-  // Text Features (character counts)
-  name: yup.number().min(0).notRequired().typeError("Must be a number"),
-  description: yup.number().min(0).notRequired().typeError("Must be a number"),
+  // Text Features
+  name: yup.string().notRequired(),
+  description: yup.string().notRequired(),
 
   // Price Strategy Inputs
   instant_bookable: yup.boolean().required(),
@@ -210,10 +210,15 @@ const DistributionChart = ({
   const maxVal = Math.max(...values);
   const minVal = Math.min(...values); // Could be negative for revenue
 
+  // Calculate range for normalization
+  // We want to handle negative values if they exist (Revenue)
+  // Simple approach: map min..max to 0..100%
+  // const range = maxVal - Math.min(0, minVal);
+
   return (
     <div className="mt-4">
       {!hideLabel && (
-        <p className="text-xs text-muted-foreground mb-2 text-left">
+        <p className="text-xs text-slate-400 mb-2 text-left">
           {label} Distribution
         </p>
       )}
@@ -241,18 +246,18 @@ const DistributionChart = ({
             >
               <div
                 className={`w-full rounded-t ${colorClass} ${
-                  val < 0 ? "opacity-30 bg-destructive" : "opacity-60"
+                  val < 0 ? "opacity-30 bg-red-500" : "opacity-60"
                 } group-hover:opacity-100 transition-all cursor-pointer`}
                 style={{ height: `${heightPercent}%` }}
               />
               {/* Tooltip */}
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-max bg-primary text-primary-foreground text-xs p-2 rounded shadow-xl z-20 pointer-events-none border border-primary/50">
-                <p className="font-bold text-primary-foreground">
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-max bg-slate-950 text-white text-xs p-2 rounded shadow-xl z-20 pointer-events-none border border-slate-700">
+                <p className="font-bold text-slate-200">
                   Top {topPercent}% Performer
                 </p>
                 <p
                   className={`text-sm ${
-                    val < 0 ? "text-red-400" : "text-primary-foreground"
+                    val < 0 ? "text-red-400" : "text-white"
                   }`}
                 >
                   ${val.toLocaleString()}
@@ -262,7 +267,7 @@ const DistributionChart = ({
           );
         })}
       </div>
-      <div className="flex justify-between text-[10px] text-muted-foreground mt-1 px-1">
+      <div className="flex justify-between text-[10px] text-slate-500 mt-1 px-1">
         <span>Top 95%</span>
         <span>Top 5%</span>
       </div>
@@ -301,8 +306,8 @@ export default function PredictionForm() {
       instant_bookable: false,
       host_is_superhost: false,
       host_identity_verified: true,
-      name: 30,
-      description: 300,
+      name: "",
+      description: "",
       neighbourhood_cleansed: "Downtown",
       property_type: "Entire condo",
     },
@@ -396,10 +401,10 @@ export default function PredictionForm() {
         className="space-y-8"
       >
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2">
-            Vancasa Airbnb Strategy
+          <h1 className="text-4xl font-bold tracking-tight text-slate-900 mb-2">
+            Vancouver Airbnb Strategy
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-slate-500">
             Optimize your listing price and predict potential revenue.
           </p>
         </div>
@@ -412,6 +417,25 @@ export default function PredictionForm() {
                 <CardTitle>Property Details</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="col-span-1 md:col-span-2 lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Listing Title (Optional)</Label>
+                    <Input
+                      id="name"
+                      placeholder="e.g. Luxury Condo with Ocean View"
+                      {...register("name")}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description (Optional)</Label>
+                    <Input
+                      id="description"
+                      placeholder="Describe the key features..."
+                      {...register("description")}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="neighbourhood">Neighbourhood</Label>
                   <Controller
@@ -420,10 +444,7 @@ export default function PredictionForm() {
                     render={({ field }) => (
                       <Select
                         value={field.value || undefined}
-                        onValueChange={(val: string) => {
-                          field.onChange(val);
-                          // Centroid update handled by useEffect
-                        }}
+                        onValueChange={field.onChange}
                       >
                         <SelectTrigger id="neighbourhood">
                           <SelectValue placeholder="Select Neighbourhood" />
@@ -527,9 +548,35 @@ export default function PredictionForm() {
                   )}
                 </div>
 
-                {/* Hidden Lat/Long Fields */}
-                <input type="hidden" {...register("latitude")} />
-                <input type="hidden" {...register("longitude")} />
+                <div className="space-y-2">
+                  <Label htmlFor="latitude">Latitude</Label>
+                  <Input
+                    id="latitude"
+                    type="number"
+                    step="any"
+                    {...register("latitude")}
+                  />
+                  {errors.latitude && (
+                    <p className="text-red-500 text-xs">
+                      {errors.latitude.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="longitude">Longitude</Label>
+                  <Input
+                    id="longitude"
+                    type="number"
+                    step="any"
+                    {...register("longitude")}
+                  />
+                  {errors.longitude && (
+                    <p className="text-red-500 text-xs">
+                      {errors.longitude.message}
+                    </p>
+                  )}
+                </div>
               </CardContent>
 
               <div className="px-6 pb-6">
@@ -572,215 +619,148 @@ export default function PredictionForm() {
             </Card>
           </motion.div>
 
-          {/* Host & Booking Settings */}
-          <motion.div variants={itemVariants} className="mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Host & Booking Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-0">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Title Length</Label>
-                  <Input
-                    id="name"
-                    type="number"
-                    min="0"
-                    placeholder="e.g. 50"
-                    {...register("name")}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Number of characters in the listing title
+          {/* Split Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Price Form */}
+            <motion.div variants={itemVariants}>
+              <Card className="h-full border-blue-100 shadow-blue-50/50">
+                <CardHeader className="bg-blue-50/30 rounded-t-lg">
+                  <CardTitle className="text-blue-900">
+                    Price Strategy Inputs
+                  </CardTitle>
+                  <p className="text-sm text-blue-600/80">
+                    Optimize for optimal nightly rate
                   </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description Length</Label>
-                  <Input
-                    id="description"
-                    type="number"
-                    min="0"
-                    placeholder="e.g. 500"
-                    {...register("description")}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Number of characters in the listing description
-                  </p>
-                </div>
-              </CardContent>
-              <CardContent className="space-y-4">
-                <Controller
-                  name="instant_bookable"
-                  control={control}
-                  render={({ field }) => (
-                    <div
-                      className="flex items-center justify-between rounded-lg border p-4 cursor-pointer hover:bg-accent/50 transition-colors"
-                      onClick={(e) => {
-                        // Only toggle if clicking outside the checkbox
-                        const target = e.target as HTMLElement;
-                        if (
-                          !target.closest('[role="checkbox"]') &&
-                          !target.closest("button")
-                        ) {
-                          field.onChange(!field.value);
-                        }
-                      }}
-                    >
+                </CardHeader>
+                <CardContent className="space-y-6 mt-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
                         <Label className="text-base">Instant Bookable</Label>
                         <p className="text-sm text-muted-foreground">
                           Allows guests to book without approval
                         </p>
                       </div>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={(checked: boolean) => {
-                            if (checked !== field.value) {
-                              field.onChange(checked);
-                            }
-                          }}
-                        />
-                      </div>
+                      <Controller
+                        name="instant_bookable"
+                        control={control}
+                        render={({ field }) => (
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        )}
+                      />
                     </div>
-                  )}
-                />
 
-                <Controller
-                  name="host_is_superhost"
-                  control={control}
-                  render={({ field }) => (
-                    <div
-                      className="flex items-center justify-between rounded-lg border p-4 cursor-pointer hover:bg-accent/50 transition-colors"
-                      onClick={(e) => {
-                        // Only toggle if clicking outside the checkbox
-                        const target = e.target as HTMLElement;
-                        if (
-                          !target.closest('[role="checkbox"]') &&
-                          !target.closest("button")
-                        ) {
-                          field.onChange(!field.value);
-                        }
-                      }}
-                    >
+                    <div className="flex items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
                         <Label className="text-base">Superhost</Label>
                         <p className="text-sm text-muted-foreground">
                           Host has Superhost status
                         </p>
                       </div>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={(checked: boolean) => {
-                            if (checked !== field.value) {
-                              field.onChange(checked);
-                            }
-                          }}
-                        />
-                      </div>
+                      <Controller
+                        name="host_is_superhost"
+                        control={control}
+                        render={({ field }) => (
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        )}
+                      />
                     </div>
-                  )}
-                />
 
-                <Controller
-                  name="host_identity_verified"
-                  control={control}
-                  render={({ field }) => (
-                    <div
-                      className="flex items-center justify-between rounded-lg border p-4 cursor-pointer hover:bg-accent/50 transition-colors"
-                      onClick={(e) => {
-                        // Only toggle if clicking outside the checkbox
-                        const target = e.target as HTMLElement;
-                        if (
-                          !target.closest('[role="checkbox"]') &&
-                          !target.closest("button")
-                        ) {
-                          field.onChange(!field.value);
-                        }
-                      }}
-                    >
+                    <div className="flex items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
                         <Label className="text-base">Identity Verified</Label>
                         <p className="text-sm text-muted-foreground">
                           Host identity is verified
                         </p>
                       </div>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={(checked: boolean) => {
-                            if (checked !== field.value) {
-                              field.onChange(checked);
-                            }
-                          }}
-                        />
-                      </div>
+                      <Controller
+                        name="host_identity_verified"
+                        control={control}
+                        render={({ field }) => (
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        )}
+                      />
                     </div>
-                  )}
-                />
 
-                <div className="space-y-2">
-                  <Label>Host Experience (Years)</Label>
-                  <Input
-                    type="number"
-                    step="0.5"
-                    {...register("host_experience_years")}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                    <div className="space-y-2">
+                      <Label>Host Experience (Years)</Label>
+                      <Input
+                        type="number"
+                        step="0.5"
+                        {...register("host_experience_years")}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-          {/* Listing Performance */}
-          <motion.div variants={itemVariants}>
-            <Card>
-              <CardHeader>
-                <CardTitle>Listing Performance</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <Label>Availability (Days per Year)</Label>
-                  <Input type="number" {...register("availability_365")} />
-                  <p className="text-xs text-muted-foreground">
-                    How many days is the listing available?
+            {/* Revenue Form */}
+            <motion.div variants={itemVariants}>
+              <Card className="h-full border-green-100 shadow-green-50/50">
+                <CardHeader className="bg-green-50/30 rounded-t-lg">
+                  <CardTitle className="text-green-900">
+                    Revenue Prediction Inputs
+                  </CardTitle>
+                  <p className="text-sm text-green-600/80">
+                    Estimate annual revenue potential
                   </p>
-                  {errors.availability_365 && (
-                    <p className="text-red-500 text-xs">
-                      {errors.availability_365.message}
+                </CardHeader>
+                <CardContent className="space-y-6 mt-6">
+                  <div className="space-y-2">
+                    <Label>Availability (Days per Year)</Label>
+                    <Input type="number" {...register("availability_365")} />
+                    <p className="text-xs text-muted-foreground">
+                      How many days is the listing available?
                     </p>
-                  )}
-                </div>
+                    {errors.availability_365 && (
+                      <p className="text-red-500 text-xs">
+                        {errors.availability_365.message}
+                      </p>
+                    )}
+                  </div>
 
-                <div className="space-y-2">
-                  <Label>Reviews per Month</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    {...register("reviews_per_month")}
-                  />
-                  {errors.reviews_per_month && (
-                    <p className="text-red-500 text-xs">
-                      {errors.reviews_per_month.message}
-                    </p>
-                  )}
-                </div>
+                  <div className="space-y-2">
+                    <Label>Reviews per Month</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      {...register("reviews_per_month")}
+                    />
+                    {errors.reviews_per_month && (
+                      <p className="text-red-500 text-xs">
+                        {errors.reviews_per_month.message}
+                      </p>
+                    )}
+                  </div>
 
-                <div className="space-y-2">
-                  <Label>Review Rating (0-5)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    max="5"
-                    {...register("review_scores_rating")}
-                  />
-                  {errors.review_scores_rating && (
-                    <p className="text-red-500 text-xs">
-                      {errors.review_scores_rating.message}
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                  <div className="space-y-2">
+                    <Label>Review Rating (0-5)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      max="5"
+                      {...register("review_scores_rating")}
+                    />
+                    {errors.review_scores_rating && (
+                      <p className="text-red-500 text-xs">
+                        {errors.review_scores_rating.message}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
         </form>
       </motion.div>
 
@@ -793,12 +773,15 @@ export default function PredictionForm() {
           <motion.div
             initial={{ opacity: 0, y: 100 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-primary text-primary-foreground shadow-2xl border-t-2 border-primary/50"
+            className="bg-slate-900 text-white shadow-2xl border-t-2 border-slate-700"
           >
             <CollapsibleTrigger asChild>
-              <Button className="w-full flex items-center justify-between p-3 hover:bg-white/10 rounded-none text-primary-foreground bg-transparent">
+              <Button
+                variant="ghost"
+                className="w-full flex items-center justify-between p-3 hover:bg-slate-800 rounded-none"
+              >
                 <div className="flex items-center gap-4 flex-1">
-                  <span className="text-sm font-semibold text-primary-foreground">
+                  <span className="text-sm font-semibold">
                     {result && !loading
                       ? "Prediction Results"
                       : !result && !loading && !error
@@ -810,18 +793,16 @@ export default function PredictionForm() {
                   {!isResultsPanelOpen && result && !loading && (
                     <div className="flex items-center gap-6 text-xs md:text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="text-primary-foreground/80 font-medium">
+                        <span className="text-blue-400 font-medium">
                           Price:
                         </span>
-                        <span className="font-bold text-primary-foreground">
-                          ${result.price.point}
-                        </span>
+                        <span className="font-bold">${result.price.point}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-primary-foreground/80 font-medium">
+                        <span className="text-green-400 font-medium">
                           Revenue:
                         </span>
-                        <span className="font-bold text-primary-foreground">
+                        <span className="font-bold">
                           ${result.revenue.point.toLocaleString()}
                         </span>
                       </div>
@@ -829,9 +810,9 @@ export default function PredictionForm() {
                   )}
                 </div>
                 {isResultsPanelOpen ? (
-                  <ChevronDown className="h-4 w-4 text-primary-foreground" />
+                  <ChevronDown className="h-4 w-4" />
                 ) : (
-                  <ChevronUp className="h-4 w-4 text-primary-foreground" />
+                  <ChevronUp className="h-4 w-4" />
                 )}
               </Button>
             </CollapsibleTrigger>
@@ -839,18 +820,18 @@ export default function PredictionForm() {
               <div className="max-h-[40vh] md:max-h-[60vh] overflow-y-auto">
                 <div className="max-w-6xl mx-auto p-3 md:p-6">
                   {!result && !loading && !error && (
-                    <Alert className="bg-card border-border text-card-foreground">
-                      <AlertTitle className="text-lg md:text-2xl font-bold mb-1 md:mb-2 text-foreground">
+                    <Alert className="bg-slate-800 border-slate-700 text-slate-200">
+                      <AlertTitle className="text-lg md:text-2xl font-bold mb-1 md:mb-2">
                         Ready to Predict
                       </AlertTitle>
-                      <AlertDescription className="text-xs md:text-base text-foreground/80">
+                      <AlertDescription className="text-xs md:text-base text-slate-400">
                         Adjust the property details above to see your estimated
                         revenue and price.
                       </AlertDescription>
                     </Alert>
                   )}
                   {loading && (
-                    <Alert className="bg-card border-border text-card-foreground">
+                    <Alert className="bg-slate-800 border-slate-700 text-slate-200">
                       <AlertDescription className="text-sm md:text-lg text-center">
                         Analyzing...
                       </AlertDescription>
@@ -859,60 +840,62 @@ export default function PredictionForm() {
                   {error && (
                     <Alert
                       variant="destructive"
-                      className="bg-destructive/10 border-destructive/50"
+                      className="bg-slate-800 border-red-500/50"
                     >
-                      <AlertTitle className="text-destructive">
-                        Error
-                      </AlertTitle>
-                      <AlertDescription className="text-destructive text-sm md:text-lg">
+                      <AlertTitle className="text-red-400">Error</AlertTitle>
+                      <AlertDescription className="text-red-400 text-sm md:text-lg">
                         {error}
                       </AlertDescription>
                     </Alert>
                   )}
                   {result && !loading && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
-                      <Card className="bg-card border-border text-center min-h-[140px] md:min-h-[180px]">
+                      <Card className="bg-slate-800 border-slate-700 text-center">
                         <CardContent className="p-3 md:p-6">
-                          <p className="text-primary font-medium mb-1 md:mb-2 text-xs md:text-base">
+                          <p className="text-blue-400 font-medium mb-1 md:mb-2 text-xs md:text-base">
                             Suggested Nightly Price
                           </p>
-                          <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2 text-foreground">
+                          <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
                             ${result.price.point}
                           </p>
                           <div className="flex items-center justify-center gap-2 mb-1">
-                            <p className="text-foreground/70 text-xs md:text-sm">
+                            <p className="text-slate-400 text-xs md:text-sm">
                               Range: ${result.price.lower} - $
                               {result.price.upper}
                             </p>
                             <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => setActiveChart("price")}
-                              className="h-8 w-8 text-foreground/70 hover:text-primary hover:bg-primary/20 hover:border hover:border-primary/30 bg-transparent"
+                              className="h-8 w-8 text-slate-400 hover:text-blue-400 hover:bg-slate-700"
                               title="View Distribution"
                             >
-                              <ChartColumnBig className="h-4 w-4" />
+                              <BarChart2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </CardContent>
                       </Card>
-                      <Card className="bg-card border-border text-center min-h-[140px] md:min-h-[180px]">
+                      <Card className="bg-slate-800 border-slate-700 text-center">
                         <CardContent className="p-3 md:p-6">
-                          <p className="text-secondary font-medium mb-1 md:mb-2 text-xs md:text-base">
+                          <p className="text-green-400 font-medium mb-1 md:mb-2 text-xs md:text-base">
                             Est. Annual Revenue
                           </p>
-                          <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2 text-foreground">
+                          <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
                             ${result.revenue.point.toLocaleString()}
                           </p>
                           <div className="flex items-center justify-center gap-2 mb-1">
-                            <p className="text-foreground/70 text-xs md:text-sm">
+                            <p className="text-slate-400 text-xs md:text-sm">
                               Range: ${result.revenue.lower.toLocaleString()} -
                               ${result.revenue.upper.toLocaleString()}
                             </p>
                             <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => setActiveChart("revenue")}
-                              className="h-8 w-8 text-foreground/70 hover:text-secondary hover:bg-secondary/20 hover:border hover:border-secondary/30 bg-transparent"
+                              className="h-8 w-8 text-slate-400 hover:text-green-400 hover:bg-slate-700"
                               title="View Distribution"
                             >
-                              <ChartColumnBig className="h-4 w-4" />
+                              <BarChart2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </CardContent>
@@ -931,9 +914,9 @@ export default function PredictionForm() {
         open={!!activeChart}
         onOpenChange={(open: boolean) => !open && setActiveChart(null)}
       >
-        <DialogContent className="bg-card border-border text-card-foreground max-w-lg">
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-card-foreground">
+            <DialogTitle className="text-xl font-bold text-white">
               {activeChart === "price"
                 ? "Price Distribution"
                 : "Revenue Distribution"}
@@ -942,7 +925,7 @@ export default function PredictionForm() {
           {result && activeChart === "price" && (
             <DistributionChart
               data={result.price.distribution}
-              colorClass="bg-accent"
+              colorClass="bg-blue-500"
               label="Price"
               hideLabel
             />
@@ -950,7 +933,7 @@ export default function PredictionForm() {
           {result && activeChart === "revenue" && (
             <DistributionChart
               data={result.revenue.distribution}
-              colorClass="bg-secondary"
+              colorClass="bg-green-500"
               label="Revenue"
               hideLabel
             />
