@@ -48,7 +48,7 @@
   /* Main colors - improved contrast for accessibility */
   --background: #fafafa; /* neutral light gray - reduced saturation */
   --foreground: #1a1a1a; /* very dark gray for maximum contrast */
-  --card: #ffffff; /* pure white - neutral */
+  --card: #ffffffcc; /* pure white - neutral */
   --card-foreground: #1a1a1a; /* very dark gray for better contrast */
   --popover: #ffffff; /* pure white - neutral */
   --popover-foreground: #1a1a1a; /* very dark gray */
@@ -61,7 +61,7 @@
   --accent: #5ab5a5; /* darker accent for better contrast */
   --accent-foreground: #0a4a35; /* dark green for better contrast */
   --destructive: oklch(0.577 0.245 27.325); /* keep red for errors */
-  --border: #b8d4c8; /* darker, more visible border */
+  --border: #b8d4c880; /* darker, more visible border */
   --input: #b8d4c8; /* darker, more visible input border */
   --ring: #3a8d7f; /* darker teal for better visibility */
   --chart-1: #3a8d7f; /* darker teal */
