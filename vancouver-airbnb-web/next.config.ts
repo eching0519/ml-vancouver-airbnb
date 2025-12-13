@@ -6,25 +6,29 @@ const nextConfig: NextConfig = {
     return [
       {
         // Set Content-Type headers for .mjs files (middleware handles CORP)
-        source: '/:path*.mjs',
+        source: "/:path*.mjs",
         headers: [
           {
-            key: 'Content-Type',
-            value: 'application/javascript',
+            key: "Content-Type",
+            value: "application/javascript",
           },
         ],
       },
       {
         // Set Content-Type headers for .wasm files (middleware handles CORP)
-        source: '/:path*.wasm',
+        source: "/:path*.wasm",
         headers: [
           {
-            key: 'Content-Type',
-            value: 'application/wasm',
+            key: "Content-Type",
+            value: "application/wasm",
           },
         ],
       },
     ];
+  },
+  // Ensure proper handling of CSS chunks
+  experimental: {
+    optimizePackageImports: ["leaflet", "react-leaflet"],
   },
 };
 

@@ -12,7 +12,15 @@
 </IfModule>
 
 # Enable Cross-Origin headers for SharedArrayBuffer (required for ONNX Runtime)
+# Only apply to HTML pages, not static assets (Next.js middleware handles _next/static paths)
 <IfModule mod_headers.c>
-  Header set Cross-Origin-Opener-Policy "same-origin"
-  Header set Cross-Origin-Embedder-Policy "require-corp"
+  <FilesMatch "\.(html|htm)$">
+    Header set Cross-Origin-Opener-Policy "same-origin"
+    Header set Cross-Origin-Embedder-Policy "require-corp"
+  </FilesMatch>
+  
+  # Add CORP headers to static assets in public directory (not _next/static, handled by middleware)
+  <FilesMatch "\.(mjs|wasm)$">
+    Header set Cross-Origin-Resource-Policy "cross-origin"
+  </FilesMatch>
 </IfModule>
