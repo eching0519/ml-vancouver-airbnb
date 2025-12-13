@@ -44,27 +44,58 @@ const NEIGHBOURHOODS = [
   "West Point Grey",
 ].sort();
 
-const ROOM_TYPES = [
-  "Entire home/apt",
-  "Private room",
-  "Shared room",
-  "Hotel room",
-];
-
+// Property type to room type mapping (moved to backend)
+// This list is used only for the property type dropdown
 const PROPERTY_TYPES = [
-  "Entire guest suite",
+  "Camper/RV",
+  "Cave",
+  "Earthen home",
+  "Entire bungalow",
   "Entire condo",
-  "Entire home",
-  "Private room in condo",
-  "Private room in home",
-  "Entire rental unit",
-  "Entire loft",
-  "Private room in rental unit",
-  "Entire serviced apartment",
+  "Entire cottage",
+  "Entire guest suite",
   "Entire guesthouse",
-  "Room in boutique hotel",
+  "Entire home",
+  "Entire loft",
+  "Entire place",
+  "Entire rental unit",
+  "Entire serviced apartment",
   "Entire townhouse",
-  "Other",
+  "Entire vacation home",
+  "Entire villa",
+  "Houseboat",
+  "Private room in bed and breakfast",
+  "Private room in boat",
+  "Private room in bungalow",
+  "Private room in camper/rv",
+  "Private room in condo",
+  "Private room in guest suite",
+  "Private room in guesthouse",
+  "Private room in home",
+  "Private room in hostel",
+  "Private room in loft",
+  "Private room in rental unit",
+  "Private room in resort",
+  "Private room in serviced apartment",
+  "Private room in tiny home",
+  "Private room in tower",
+  "Private room in townhouse",
+  "Private room in villa",
+  "Riad",
+  "Room in aparthotel",
+  "Room in bed and breakfast",
+  "Room in boutique hotel",
+  "Room in hotel",
+  "Shared room in barn",
+  "Shared room in condo",
+  "Shared room in home",
+  "Shared room in hostel",
+  "Shared room in hotel",
+  "Shared room in loft",
+  "Shared room in rental unit",
+  "Shared room in tiny home",
+  "Tiny home",
+  "Tower",
 ].sort();
 
 const AMENITIES_LIST = [
@@ -93,7 +124,6 @@ const AMENITIES_LIST = [
 const schema = yup.object({
   // Common
   neighbourhood_cleansed: yup.string().required("Neighbourhood is required"),
-  room_type: yup.string().required("Room type is required"),
   property_type: yup.string().required("Property type is required"),
   accommodates: yup.number().min(1).required().typeError("Must be a number"),
   bedrooms: yup.number().min(0).required().typeError("Must be a number"),
@@ -182,15 +212,18 @@ const DistributionChart = ({
           const val = data[`q${p}`];
           // Top X% = 100 - p
           const topPercent = 100 - p;
-          
+
           // Normalize height. If val is negative, we might want to show it differently,
           // but for simplicity let's just clamp to 0 for height and maybe use color to indicate?
           // Actually, let's just make it relative to max.
           // If val < 0, height = 0? Or maybe a small bar going down?
           // Let's assume mostly positive for Price. Revenue might be negative.
-          
-          const heightPercent = Math.max(5, (Math.abs(val) / Math.max(Math.abs(maxVal), Math.abs(minVal))) * 100);
-          
+
+          const heightPercent = Math.max(
+            5,
+            (Math.abs(val) / Math.max(Math.abs(maxVal), Math.abs(minVal))) * 100
+          );
+
           return (
             <div
               key={p}
@@ -204,8 +237,14 @@ const DistributionChart = ({
               />
               {/* Tooltip */}
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-max bg-slate-950 text-white text-xs p-2 rounded shadow-xl z-20 pointer-events-none border border-slate-700">
-                <p className="font-bold text-slate-200">Top {topPercent}% Performer</p>
-                <p className={`text-sm ${val < 0 ? "text-red-400" : "text-white"}`}>
+                <p className="font-bold text-slate-200">
+                  Top {topPercent}% Performer
+                </p>
+                <p
+                  className={`text-sm ${
+                    val < 0 ? "text-red-400" : "text-white"
+                  }`}
+                >
                   ${val.toLocaleString()}
                 </p>
               </div>
@@ -233,6 +272,7 @@ export default function PredictionForm() {
     register,
     control,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: yupResolver(schema) as Resolver<FormData>,
@@ -254,7 +294,6 @@ export default function PredictionForm() {
       name: "",
       description: "",
       neighbourhood_cleansed: "Downtown",
-      room_type: "Entire home/apt",
       property_type: "Entire condo",
     },
   });
@@ -268,7 +307,6 @@ export default function PredictionForm() {
     return JSON.stringify(formValues);
   }, [
     formValues.neighbourhood_cleansed,
-    formValues.room_type,
     formValues.property_type,
     formValues.accommodates,
     formValues.bedrooms,
@@ -276,7 +314,7 @@ export default function PredictionForm() {
     formValues.beds,
     formValues.latitude,
     formValues.longitude,
-    formValues.amenities?.join(','),
+    formValues.amenities?.join(","),
     formValues.name,
     formValues.description,
     formValues.instant_bookable,
@@ -308,7 +346,6 @@ export default function PredictionForm() {
       // Check if required fields are filled
       if (
         !currentFormValues.neighbourhood_cleansed ||
-        !currentFormValues.room_type ||
         !currentFormValues.property_type
       ) {
         return;
@@ -324,7 +361,11 @@ export default function PredictionForm() {
         setResult(prediction);
       } catch (e) {
         console.error("Prediction error:", e);
-        setError(`Failed to run prediction: ${e instanceof Error ? e.message : "Please ensure models are loaded."}`);
+        setError(
+          `Failed to run prediction: ${
+            e instanceof Error ? e.message : "Please ensure models are loaded."
+          }`
+        );
       } finally {
         setLoading(false);
       }
@@ -413,23 +454,6 @@ export default function PredictionForm() {
                   {errors.neighbourhood_cleansed && (
                     <p className="text-red-500 text-xs">
                       {errors.neighbourhood_cleansed.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="room_type">Room Type</Label>
-                  <Select id="room_type" {...register("room_type")}>
-                    <option value="">Select Room Type</option>
-                    {ROOM_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </Select>
-                  {errors.room_type && (
-                    <p className="text-red-500 text-xs">
-                      {errors.room_type.message}
                     </p>
                   )}
                 </div>

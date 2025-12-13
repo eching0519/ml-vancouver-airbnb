@@ -33,9 +33,62 @@ interface ModelsMetadata {
 
 const typedMetadata = metadata as ModelsMetadata;
 
+// Property type to room type mapping
+const PROPERTY_TYPE_TO_ROOM_TYPE: Record<string, string> = {
+  "Camper/RV": "Entire home/apt",
+  Cave: "Entire home/apt",
+  "Earthen home": "Entire home/apt",
+  "Entire bungalow": "Entire home/apt",
+  "Entire condo": "Entire home/apt",
+  "Entire cottage": "Entire home/apt",
+  "Entire guest suite": "Entire home/apt",
+  "Entire guesthouse": "Entire home/apt",
+  "Entire home": "Entire home/apt",
+  "Entire loft": "Entire home/apt",
+  "Entire place": "Entire home/apt",
+  "Entire rental unit": "Entire home/apt",
+  "Entire serviced apartment": "Entire home/apt",
+  "Entire townhouse": "Entire home/apt",
+  "Entire vacation home": "Entire home/apt",
+  "Entire villa": "Entire home/apt",
+  Houseboat: "Entire home/apt",
+  "Private room in bed and breakfast": "Private room",
+  "Private room in boat": "Private room",
+  "Private room in bungalow": "Private room",
+  "Private room in camper/rv": "Private room",
+  "Private room in condo": "Private room",
+  "Private room in guest suite": "Private room",
+  "Private room in guesthouse": "Private room",
+  "Private room in home": "Private room",
+  "Private room in hostel": "Private room",
+  "Private room in loft": "Private room",
+  "Private room in rental unit": "Private room",
+  "Private room in resort": "Private room",
+  "Private room in serviced apartment": "Private room",
+  "Private room in tiny home": "Private room",
+  "Private room in tower": "Private room",
+  "Private room in townhouse": "Private room",
+  "Private room in villa": "Private room",
+  Riad: "Entire home/apt",
+  "Room in aparthotel": "Entire home/apt",
+  "Room in bed and breakfast": "Hotel room",
+  "Room in boutique hotel": "Private room",
+  "Room in hotel": "Private room",
+  "Shared room in barn": "Shared room",
+  "Shared room in condo": "Shared room",
+  "Shared room in home": "Shared room",
+  "Shared room in hostel": "Shared room",
+  "Shared room in hotel": "Shared room",
+  "Shared room in loft": "Shared room",
+  "Shared room in rental unit": "Shared room",
+  "Shared room in tiny home": "Shared room",
+  "Tiny home": "Entire home/apt",
+  Tower: "Entire home/apt",
+};
+
 export interface PredictionFormData {
   neighbourhood_cleansed: string;
-  room_type: string;
+  room_type?: string; // Optional - will be derived from property_type if not provided
   property_type: string;
   accommodates: number;
   bedrooms: number;
@@ -140,7 +193,10 @@ export class InferenceEngine {
           "ort-wasm-simd-threaded.wasm": "/ort-wasm-simd-threaded.wasm",
         };
       } catch (wasmPathError) {
-        console.warn("Failed to set custom WASM paths, using defaults:", wasmPathError);
+        console.warn(
+          "Failed to set custom WASM paths, using defaults:",
+          wasmPathError
+        );
       }
 
       const modelNames = ["Price_Model", "Revenue_Model"];
@@ -160,7 +216,13 @@ export class InferenceEngine {
           console.log(`Successfully loaded model: ${name}`);
         } catch (modelError) {
           console.error(`Failed to load model ${name}:`, modelError);
-          throw new Error(`Failed to load model ${name}: ${modelError instanceof Error ? modelError.message : String(modelError)}`);
+          throw new Error(
+            `Failed to load model ${name}: ${
+              modelError instanceof Error
+                ? modelError.message
+                : String(modelError)
+            }`
+          );
         }
       });
 
@@ -169,7 +231,11 @@ export class InferenceEngine {
       console.log("ONNX inference engine initialized successfully");
     } catch (e) {
       console.error("Failed to initialize ONNX sessions:", e);
-      throw new Error(`Inference engine initialization failed: ${e instanceof Error ? e.message : String(e)}`);
+      throw new Error(
+        `Inference engine initialization failed: ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      );
     }
   }
 
@@ -184,6 +250,12 @@ export class InferenceEngine {
 
     // Helper to set feature
     const setF = (name: string, val: number) => featureMap.set(name, val);
+
+    // Derive room_type from property_type if not provided
+    const room_type =
+      data.room_type ||
+      PROPERTY_TYPE_TO_ROOM_TYPE[data.property_type] ||
+      "Entire home/apt";
 
     // 1. Basic numeric inputs
     setF("accommodates", data.accommodates);
@@ -300,8 +372,8 @@ export class InferenceEngine {
 
     // rt_X (Room Type)
     // Model feature names: rt_Entire home/apt, etc.
-    // Form values: 'Entire home/apt', etc.
-    setF(`rt_${data.room_type}`, 1);
+    // Room type is derived from property_type if not provided
+    setF(`rt_${room_type}`, 1);
 
     // 5. Categoricals: Label Encoding
     // property_type
@@ -420,7 +492,11 @@ export class InferenceEngine {
         return val[0];
       };
 
-      const processResults = (results: Record<string, any>, prefix: string, isLogPoint: boolean) => {
+      const processResults = (
+        results: Record<string, any>,
+        prefix: string,
+        isLogPoint: boolean
+      ) => {
         const distribution: Record<string, number> = {};
         let point = 0;
         let lower = 0;
@@ -454,7 +530,7 @@ export class InferenceEngine {
             if (match) {
               const p = parseInt(match[1]);
               // Store for sorting/smoothing later
-              // We might have duplicates (e.g. Price_Lower_q5 vs Price_q5). 
+              // We might have duplicates (e.g. Price_Lower_q5 vs Price_q5).
               // We'll push all and dedup by p later or just let sort handle it?
               // Better to use a map to dedup first.
             }
@@ -465,38 +541,38 @@ export class InferenceEngine {
         const qMap = new Map<number, number>();
         Object.keys(results).forEach((key) => {
           if (!key.includes(prefix)) return;
-          
+
           let val = getVal(results[key]);
           // Only Point is log-transformed in our training setup
           if (key.includes("Point")) {
             if (isLogPoint) val = Math.expm1(val);
-             distribution["Point"] = Math.round(val);
-             point = Math.round(val);
-             return;
+            distribution["Point"] = Math.round(val);
+            point = Math.round(val);
+            return;
           }
 
           // Quantiles (linear)
           const match = key.match(/q(\d+)/);
           if (match) {
-             const p = parseInt(match[1]);
-             qMap.set(p, Math.round(val));
+            const p = parseInt(match[1]);
+            qMap.set(p, Math.round(val));
           }
         });
 
         // 3. Enforce Monotonicity (Fix crossing quantiles)
         // Extract p and val
         const sortedPs = Array.from(qMap.keys()).sort((a, b) => a - b);
-        const values = sortedPs.map(p => qMap.get(p)!);
-        
+        const values = sortedPs.map((p) => qMap.get(p)!);
+
         // Sort values to enforce q_low <= q_high (Rearrangement)
         values.sort((a, b) => a - b);
 
         // 4. Re-assign to distribution
         sortedPs.forEach((p, i) => {
-            const val = values[i];
-            distribution[`q${p}`] = val;
-            if (p === 5) lower = val;
-            if (p === 95) upper = val;
+          const val = values[i];
+          distribution[`q${p}`] = val;
+          if (p === 5) lower = val;
+          if (p === 95) upper = val;
         });
 
         return { point, lower, upper, distribution };
@@ -509,13 +585,13 @@ export class InferenceEngine {
 
       console.log("Prediction completed successfully:", result);
       return result;
-
     } catch (e) {
       console.error("Prediction failed:", e);
-      throw new Error(`Prediction failed: ${e instanceof Error ? e.message : String(e)}`);
+      throw new Error(
+        `Prediction failed: ${e instanceof Error ? e.message : String(e)}`
+      );
     }
   }
-
 }
 
 export const inferenceEngine = new InferenceEngine();
