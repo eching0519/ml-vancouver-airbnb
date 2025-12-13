@@ -1,9 +1,11 @@
 "use client";
 
+import { NeighbourhoodGeoJSON, getNeighbourhoodCentroid } from "@/lib/geoUtils";
 import { PredictionFormData, PredictionResult } from "@/lib/inference";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { motion } from "framer-motion";
 import { BarChart2, ChevronDown, ChevronUp } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, Resolver, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -26,6 +28,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+
+// Dynamically import map to avoid SSR issues
+const NeighbourhoodMap = dynamic(() => import("./NeighbourhoodMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] w-full bg-slate-100 animate-pulse rounded-lg flex items-center justify-center text-slate-400">
+      Loading Map...
+    </div>
+  ),
+});
 
 // --- Constants & Data ---
 
@@ -206,11 +218,6 @@ const DistributionChart = ({
   const maxVal = Math.max(...values);
   const minVal = Math.min(...values); // Could be negative for revenue
 
-  // Calculate range for normalization
-  // We want to handle negative values if they exist (Revenue)
-  // Simple approach: map min..max to 0..100%
-  const range = maxVal - Math.min(0, minVal);
-
   return (
     <div className="mt-4">
       {!hideLabel && (
@@ -279,6 +286,9 @@ export default function PredictionForm() {
     null
   );
   const [isResultsPanelOpen, setIsResultsPanelOpen] = useState(true);
+  const [geoJsonData, setGeoJsonData] = useState<NeighbourhoodGeoJSON | null>(
+    null
+  );
 
   const {
     register,
@@ -310,33 +320,44 @@ export default function PredictionForm() {
     },
   });
 
+  // Fetch GeoJSON on mount
+  useEffect(() => {
+    fetch("/neighbourhoods.geojson")
+      .then((res) => res.json())
+      .then((data) => {
+        setGeoJsonData(data);
+      })
+      .catch((err) => console.error("Failed to load map data", err));
+  }, []);
+
   // Watch all form values
   const formValues = watch();
+
+  // Watch neighbourhood changes to update lat/long
+  const selectedNeighbourhood = watch("neighbourhood_cleansed");
+
+  useEffect(() => {
+    if (selectedNeighbourhood && geoJsonData) {
+      const centroid = getNeighbourhoodCentroid(
+        geoJsonData,
+        selectedNeighbourhood
+      );
+      if (centroid) {
+        // Only update if significantly different to avoid loops (though check won't hurt)
+        // Actually, we just enforce the centroid when neighbourhood changes.
+        // But we need to be careful not to overwrite user input if they had a way to input custom lat/long.
+        // Since we removed the inputs, we can just overwrite.
+        setValue("latitude", centroid.lat);
+        setValue("longitude", centroid.lng);
+      }
+    }
+  }, [selectedNeighbourhood, geoJsonData, setValue]);
 
   // Memoize form values to prevent unnecessary re-renders
   // Serialize to string for stable comparison
   const formValuesString = useMemo(() => {
     return JSON.stringify(formValues);
-  }, [
-    formValues.neighbourhood_cleansed,
-    formValues.property_type,
-    formValues.accommodates,
-    formValues.bedrooms,
-    formValues.bathrooms,
-    formValues.beds,
-    formValues.latitude,
-    formValues.longitude,
-    formValues.amenities?.join(","),
-    formValues.name,
-    formValues.description,
-    formValues.instant_bookable,
-    formValues.host_is_superhost,
-    formValues.host_identity_verified,
-    formValues.host_experience_years,
-    formValues.availability_365,
-    formValues.reviews_per_month,
-    formValues.review_scores_rating,
-  ]);
+  }, [formValues]);
 
   // Track previous form values to prevent duplicate predictions
   const prevFormValuesRef = useRef<string>("");
@@ -463,6 +484,29 @@ export default function PredictionForm() {
                   </div>
                 </div>
 
+                {/* Map Section */}
+                <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                  <Label className="mb-2 block">Location</Label>
+                  <NeighbourhoodMap
+                    geoJsonData={geoJsonData}
+                    selectedNeighbourhood={selectedNeighbourhood}
+                    onSelectNeighbourhood={(name, lat, lng) => {
+                      setValue("neighbourhood_cleansed", name);
+                      setValue("latitude", lat);
+                      setValue("longitude", lng);
+                    }}
+                  />
+                  <div className="flex justify-between items-center mt-2">
+                    <p className="text-xs text-slate-500">
+                      Select a neighbourhood on the map or use the dropdown.
+                    </p>
+                    <div className="text-xs text-slate-400">
+                      Lat: {watch("latitude").toFixed(4)}, Lng:{" "}
+                      {watch("longitude").toFixed(4)}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="neighbourhood">Neighbourhood</Label>
                   <Controller
@@ -471,7 +515,10 @@ export default function PredictionForm() {
                     render={({ field }) => (
                       <Select
                         value={field.value || undefined}
-                        onValueChange={field.onChange}
+                        onValueChange={(val) => {
+                          field.onChange(val);
+                          // Centroid update handled by useEffect
+                        }}
                       >
                         <SelectTrigger id="neighbourhood">
                           <SelectValue placeholder="Select Neighbourhood" />
@@ -575,35 +622,9 @@ export default function PredictionForm() {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="latitude">Latitude</Label>
-                  <Input
-                    id="latitude"
-                    type="number"
-                    step="any"
-                    {...register("latitude")}
-                  />
-                  {errors.latitude && (
-                    <p className="text-red-500 text-xs">
-                      {errors.latitude.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="longitude">Longitude</Label>
-                  <Input
-                    id="longitude"
-                    type="number"
-                    step="any"
-                    {...register("longitude")}
-                  />
-                  {errors.longitude && (
-                    <p className="text-red-500 text-xs">
-                      {errors.longitude.message}
-                    </p>
-                  )}
-                </div>
+                {/* Hidden Lat/Long Fields */}
+                <input type="hidden" {...register("latitude")} />
+                <input type="hidden" {...register("longitude")} />
               </CardContent>
 
               <div className="px-6 pb-6">
@@ -866,7 +887,7 @@ export default function PredictionForm() {
                             <div className="h-12 bg-slate-700 rounded w-1/2 mx-auto"></div>
                             <div className="flex items-center justify-center gap-2">
                               <div className="h-4 bg-slate-700 rounded flex-1"></div>
-                              <div className="h-8 w-8 bg-slate-700 rounded flex-shrink-0"></div>
+                              <div className="h-8 w-8 bg-slate-700 rounded shrink-0"></div>
                             </div>
                           </div>
                         </CardContent>
@@ -878,7 +899,7 @@ export default function PredictionForm() {
                             <div className="h-12 bg-slate-700 rounded w-1/2 mx-auto"></div>
                             <div className="flex items-center justify-center gap-2">
                               <div className="h-4 bg-slate-700 rounded flex-1"></div>
-                              <div className="h-8 w-8 bg-slate-700 rounded flex-shrink-0"></div>
+                              <div className="h-8 w-8 bg-slate-700 rounded shrink-0"></div>
                             </div>
                           </div>
                         </CardContent>
