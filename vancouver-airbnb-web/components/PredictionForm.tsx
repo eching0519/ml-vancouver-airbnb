@@ -1,6 +1,5 @@
 "use client";
 
-import { getNeighbourhoodCentroid, NeighbourhoodGeoJSON } from "@/lib/geoUtils";
 import {
   inferenceEngine,
   PredictionFormData,
@@ -9,7 +8,6 @@ import {
 import { yupResolver } from "@hookform/resolvers/yup";
 import { motion } from "framer-motion";
 import { ChartColumnBig, ChevronDown, ChevronUp } from "lucide-react";
-import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, Resolver, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -32,16 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-
-// Dynamically import map to avoid SSR issues
-const NeighbourhoodMap = dynamic(() => import("./NeighbourhoodMap"), {
-  ssr: false,
-  loading: () => (
-    <div className="h-[400px] w-full bg-muted animate-pulse rounded-lg flex items-center justify-center text-muted-foreground">
-      Loading Map...
-    </div>
-  ),
-});
 
 // --- Constants & Data ---
 
@@ -290,15 +278,11 @@ export default function PredictionForm() {
     null
   );
   const [isResultsPanelOpen, setIsResultsPanelOpen] = useState(true);
-  const [geoJsonData, setGeoJsonData] = useState<NeighbourhoodGeoJSON | null>(
-    null
-  );
 
   const {
     register,
     control,
     watch,
-    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: yupResolver(schema) as Resolver<FormData>,
@@ -324,38 +308,8 @@ export default function PredictionForm() {
     },
   });
 
-  // Fetch GeoJSON on mount
-  useEffect(() => {
-    fetch("/neighbourhoods.geojson")
-      .then((res) => res.json())
-      .then((data) => {
-        setGeoJsonData(data);
-      })
-      .catch((err) => console.error("Failed to load map data", err));
-  }, []);
-
   // Watch all form values
   const formValues = watch();
-
-  // Watch neighbourhood changes to update lat/long
-  const selectedNeighbourhood = watch("neighbourhood_cleansed");
-
-  useEffect(() => {
-    if (selectedNeighbourhood && geoJsonData) {
-      const centroid = getNeighbourhoodCentroid(
-        geoJsonData,
-        selectedNeighbourhood
-      );
-      if (centroid) {
-        // Only update if significantly different to avoid loops (though check won't hurt)
-        // Actually, we just enforce the centroid when neighbourhood changes.
-        // But we need to be careful not to overwrite user input if they had a way to input custom lat/long.
-        // Since we removed the inputs, we can just overwrite.
-        setValue("latitude", centroid.lat);
-        setValue("longitude", centroid.lng);
-      }
-    }
-  }, [selectedNeighbourhood, geoJsonData, setValue]);
 
   // Memoize form values to prevent unnecessary re-renders
   // Serialize to string for stable comparison
@@ -533,25 +487,6 @@ export default function PredictionForm() {
                       {errors.accommodates.message}
                     </p>
                   )}
-                </div>
-
-                {/* Map Section */}
-                <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                  <NeighbourhoodMap
-                    geoJsonData={geoJsonData}
-                    selectedNeighbourhood={selectedNeighbourhood}
-                    onSelectNeighbourhood={(name, lat, lng) => {
-                      setValue("neighbourhood_cleansed", name);
-                      setValue("latitude", lat);
-                      setValue("longitude", lng);
-                    }}
-                  />
-                  <div className="flex justify-between items-center mt-2">
-                    <div className="text-xs text-muted-foreground/70">
-                      Lat: {watch("latitude").toFixed(4)}, Lng:{" "}
-                      {watch("longitude").toFixed(4)}
-                    </div>
-                  </div>
                 </div>
 
                 <div className="space-y-2">
