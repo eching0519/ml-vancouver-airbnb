@@ -6,15 +6,30 @@ import {
   PredictionResult,
 } from "@/lib/inference";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { AnimatePresence, motion } from "framer-motion";
-import { BarChart2, X } from "lucide-react";
+import { motion } from "framer-motion";
+import { BarChart2, ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, Resolver, useForm } from "react-hook-form";
 import * as yup from "yup";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Checkbox } from "./ui/checkbox";
-import { Input, Label } from "./ui/form-elements";
-import { Select } from "./ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "./ui/collapsible";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 // --- Constants & Data ---
 
@@ -267,6 +282,7 @@ export default function PredictionForm() {
   const [activeChart, setActiveChart] = useState<"price" | "revenue" | null>(
     null
   );
+  const [isResultsPanelOpen, setIsResultsPanelOpen] = useState(true);
 
   const {
     register,
@@ -359,6 +375,8 @@ export default function PredictionForm() {
           currentFormValues as PredictionFormData
         );
         setResult(prediction);
+        // Auto-expand panel when results arrive
+        setIsResultsPanelOpen(true);
       } catch (e) {
         console.error("Prediction error:", e);
         setError(
@@ -440,17 +458,27 @@ export default function PredictionForm() {
 
                 <div className="space-y-2">
                   <Label htmlFor="neighbourhood">Neighbourhood</Label>
-                  <Select
-                    id="neighbourhood"
-                    {...register("neighbourhood_cleansed")}
-                  >
-                    <option value="">Select Neighbourhood</option>
-                    {NEIGHBOURHOODS.map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </Select>
+                  <Controller
+                    name="neighbourhood_cleansed"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value || undefined}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger id="neighbourhood">
+                          <SelectValue placeholder="Select Neighbourhood" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {NEIGHBOURHOODS.map((n) => (
+                            <SelectItem key={n} value={n}>
+                              {n}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                   {errors.neighbourhood_cleansed && (
                     <p className="text-red-500 text-xs">
                       {errors.neighbourhood_cleansed.message}
@@ -460,14 +488,27 @@ export default function PredictionForm() {
 
                 <div className="space-y-2">
                   <Label htmlFor="property_type">Property Type</Label>
-                  <Select id="property_type" {...register("property_type")}>
-                    <option value="">Select Property Type</option>
-                    {PROPERTY_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </Select>
+                  <Controller
+                    name="property_type"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value || undefined}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger id="property_type">
+                          <SelectValue placeholder="Select Property Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PROPERTY_TYPES.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                   {errors.property_type && (
                     <p className="text-red-500 text-xs">
                       {errors.property_type.message}
@@ -571,8 +612,7 @@ export default function PredictionForm() {
                             <Checkbox
                               id={`amenity-${amenity}`}
                               checked={field.value?.includes(amenity)}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
+                              onCheckedChange={(checked) => {
                                 const current = field.value || [];
                                 if (checked) {
                                   field.onChange([...current, amenity]);
@@ -627,7 +667,7 @@ export default function PredictionForm() {
                         render={({ field }) => (
                           <Checkbox
                             checked={field.value}
-                            onChange={(e) => field.onChange(e.target.checked)}
+                            onCheckedChange={field.onChange}
                           />
                         )}
                       />
@@ -646,7 +686,7 @@ export default function PredictionForm() {
                         render={({ field }) => (
                           <Checkbox
                             checked={field.value}
-                            onChange={(e) => field.onChange(e.target.checked)}
+                            onCheckedChange={field.onChange}
                           />
                         )}
                       />
@@ -665,7 +705,7 @@ export default function PredictionForm() {
                         render={({ field }) => (
                           <Checkbox
                             checked={field.value}
-                            onChange={(e) => field.onChange(e.target.checked)}
+                            onCheckedChange={field.onChange}
                           />
                         )}
                       />
@@ -744,137 +784,182 @@ export default function PredictionForm() {
         </form>
       </motion.div>
 
-      {/* Fixed Results Panel at Bottom */}
-      <motion.div
-        initial={{ opacity: 0, y: 100 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="fixed bottom-0 left-0 right-0 bg-slate-900 text-white shadow-2xl border-t-2 border-slate-700 z-50 max-h-[40vh] md:max-h-none overflow-y-auto"
-      >
-        <div className="max-w-6xl mx-auto p-3 md:p-6">
-          {!result && !loading && !error && (
-            <div className="text-center py-4 md:py-8">
-              <h2 className="text-lg md:text-2xl font-bold mb-1 md:mb-2 text-slate-200">
-                Ready to Predict
-              </h2>
-              <p className="text-xs md:text-base text-slate-400">
-                Adjust the property details above to see your estimated revenue
-                and price.
-              </p>
-            </div>
-          )}
-          {loading && (
-            <div className="text-center py-4 md:py-8">
-              <p className="text-sm md:text-lg">Analyzing...</p>
-            </div>
-          )}
-          {error && (
-            <div className="text-center py-4 md:py-8">
-              <p className="text-red-400 text-sm md:text-lg">{error}</p>
-            </div>
-          )}
-          {result && !loading && (
-            <>
-              <h2 className="text-lg md:text-2xl font-bold mb-3 md:mb-6 text-center">
-                Prediction Results
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 text-center">
-                <div className="p-3 md:p-6 bg-slate-800 rounded-lg">
-                  <p className="text-blue-400 font-medium mb-1 md:mb-2 text-xs md:text-base">
-                    Suggested Nightly Price
-                  </p>
-                  <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
-                    ${result.price.point}
-                  </p>
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <p className="text-slate-400 text-xs md:text-sm">
-                      Range: ${result.price.lower} - ${result.price.upper}
-                    </p>
-                    <button
-                      onClick={() => setActiveChart("price")}
-                      className="p-1 hover:bg-slate-700 rounded-full transition-colors"
-                      title="View Distribution"
-                    >
-                      <BarChart2 className="w-4 h-4 text-slate-400 hover:text-blue-400" />
-                    </button>
-                  </div>
+      {/* Sticky Collapsible Results Panel at Bottom */}
+      <div className="fixed bottom-0 left-0 right-0 z-50">
+        <Collapsible
+          open={isResultsPanelOpen}
+          onOpenChange={setIsResultsPanelOpen}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-slate-900 text-white shadow-2xl border-t-2 border-slate-700"
+          >
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full flex items-center justify-between p-3 hover:bg-slate-800 rounded-none"
+              >
+                <div className="flex items-center gap-4 flex-1">
+                  <span className="text-sm font-semibold">
+                    {result && !loading
+                      ? "Prediction Results"
+                      : !result && !loading && !error
+                      ? "Ready to Predict"
+                      : loading
+                      ? "Analyzing..."
+                      : "Error"}
+                  </span>
+                  {!isResultsPanelOpen && result && !loading && (
+                    <div className="flex items-center gap-6 text-xs md:text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-blue-400 font-medium">
+                          Price:
+                        </span>
+                        <span className="font-bold">${result.price.point}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-400 font-medium">
+                          Revenue:
+                        </span>
+                        <span className="font-bold">
+                          ${result.revenue.point.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="p-3 md:p-6 bg-slate-800 rounded-lg">
-                  <p className="text-green-400 font-medium mb-1 md:mb-2 text-xs md:text-base">
-                    Est. Annual Revenue
-                  </p>
-                  <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
-                    ${result.revenue.point.toLocaleString()}
-                  </p>
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <p className="text-slate-400 text-xs md:text-sm">
-                      Range: ${result.revenue.lower.toLocaleString()} - $
-                      {result.revenue.upper.toLocaleString()}
-                    </p>
-                    <button
-                      onClick={() => setActiveChart("revenue")}
-                      className="p-1 hover:bg-slate-700 rounded-full transition-colors"
-                      title="View Distribution"
+                {isResultsPanelOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+              <div className="max-h-[40vh] md:max-h-[60vh] overflow-y-auto">
+                <div className="max-w-6xl mx-auto p-3 md:p-6">
+                  {!result && !loading && !error && (
+                    <Alert className="bg-slate-800 border-slate-700 text-slate-200">
+                      <AlertTitle className="text-lg md:text-2xl font-bold mb-1 md:mb-2">
+                        Ready to Predict
+                      </AlertTitle>
+                      <AlertDescription className="text-xs md:text-base text-slate-400">
+                        Adjust the property details above to see your estimated
+                        revenue and price.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {loading && (
+                    <Alert className="bg-slate-800 border-slate-700 text-slate-200">
+                      <AlertDescription className="text-sm md:text-lg text-center">
+                        Analyzing...
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {error && (
+                    <Alert
+                      variant="destructive"
+                      className="bg-slate-800 border-red-500/50"
                     >
-                      <BarChart2 className="w-4 h-4 text-slate-400 hover:text-green-400" />
-                    </button>
-                  </div>
+                      <AlertTitle className="text-red-400">Error</AlertTitle>
+                      <AlertDescription className="text-red-400 text-sm md:text-lg">
+                        {error}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {result && !loading && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
+                      <Card className="bg-slate-800 border-slate-700 text-center">
+                        <CardContent className="p-3 md:p-6">
+                          <p className="text-blue-400 font-medium mb-1 md:mb-2 text-xs md:text-base">
+                            Suggested Nightly Price
+                          </p>
+                          <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
+                            ${result.price.point}
+                          </p>
+                          <div className="flex items-center justify-center gap-2 mb-1">
+                            <p className="text-slate-400 text-xs md:text-sm">
+                              Range: ${result.price.lower} - $
+                              {result.price.upper}
+                            </p>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setActiveChart("price")}
+                              className="h-8 w-8 text-slate-400 hover:text-blue-400 hover:bg-slate-700"
+                              title="View Distribution"
+                            >
+                              <BarChart2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-slate-800 border-slate-700 text-center">
+                        <CardContent className="p-3 md:p-6">
+                          <p className="text-green-400 font-medium mb-1 md:mb-2 text-xs md:text-base">
+                            Est. Annual Revenue
+                          </p>
+                          <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
+                            ${result.revenue.point.toLocaleString()}
+                          </p>
+                          <div className="flex items-center justify-center gap-2 mb-1">
+                            <p className="text-slate-400 text-xs md:text-sm">
+                              Range: ${result.revenue.lower.toLocaleString()} -
+                              ${result.revenue.upper.toLocaleString()}
+                            </p>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setActiveChart("revenue")}
+                              className="h-8 w-8 text-slate-400 hover:text-green-400 hover:bg-slate-700"
+                              title="View Distribution"
+                            >
+                              <BarChart2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
                 </div>
               </div>
-            </>
-          )}
-        </div>
-      </motion.div>
-
-      {/* Chart Modal */}
-      <AnimatePresence>
-        {result && activeChart && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
-            onClick={() => setActiveChart(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-900 border border-slate-700 p-6 rounded-xl max-w-lg w-full shadow-2xl relative"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setActiveChart(null)}
-                className="absolute top-4 right-4 p-1 hover:bg-slate-800 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-400 hover:text-white" />
-              </button>
-
-              <h3 className="text-xl font-bold text-white mb-6">
-                {activeChart === "price"
-                  ? "Price Distribution"
-                  : "Revenue Distribution"}
-              </h3>
-
-              {activeChart === "price" && (
-                <DistributionChart
-                  data={result.price.distribution}
-                  colorClass="bg-blue-500"
-                  label="Price"
-                  hideLabel
-                />
-              )}
-              {activeChart === "revenue" && (
-                <DistributionChart
-                  data={result.revenue.distribution}
-                  colorClass="bg-green-500"
-                  label="Revenue"
-                  hideLabel
-                />
-              )}
-            </motion.div>
+            </CollapsibleContent>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </Collapsible>
+      </div>
+
+      {/* Chart Dialog */}
+      <Dialog
+        open={!!activeChart}
+        onOpenChange={(open) => !open && setActiveChart(null)}
+      >
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-white">
+              {activeChart === "price"
+                ? "Price Distribution"
+                : "Revenue Distribution"}
+            </DialogTitle>
+          </DialogHeader>
+          {result && activeChart === "price" && (
+            <DistributionChart
+              data={result.price.distribution}
+              colorClass="bg-blue-500"
+              label="Price"
+              hideLabel
+            />
+          )}
+          {result && activeChart === "revenue" && (
+            <DistributionChart
+              data={result.revenue.distribution}
+              colorClass="bg-green-500"
+              label="Revenue"
+              hideLabel
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
