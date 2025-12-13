@@ -1,67 +1,28 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  turbopack: {
-    root: __dirname,
-  },
-  // Headers migrated from middleware.ts to use the proxy pattern
+  // Headers are now handled by middleware.ts to avoid conflicts with Next.js internal routes
   async headers() {
     return [
       {
-        // Add CORP headers to Next.js static chunks so they work with COEP
-        // This is required when COEP is enabled on the HTML page
-        source: "/_next/static/:path*",
+        // Set Content-Type headers for .mjs files (middleware handles CORP)
+        source: '/:path*.mjs',
         headers: [
           {
-            key: "Cross-Origin-Resource-Policy",
-            value: "same-origin",
+            key: 'Content-Type',
+            value: 'application/javascript',
           },
         ],
       },
       {
-        // Set Content-Type and CORP headers for .mjs files
-        source: "/:path*.mjs",
+        // Set Content-Type headers for .wasm files (middleware handles CORP)
+        source: '/:path*.wasm',
         headers: [
           {
-            key: "Content-Type",
-            value: "application/javascript",
-          },
-          {
-            key: "Cross-Origin-Resource-Policy",
-            value: "cross-origin",
+            key: 'Content-Type',
+            value: 'application/wasm',
           },
         ],
-      },
-      {
-        // Set Content-Type and CORP headers for .wasm files
-        source: "/:path*.wasm",
-        headers: [
-          {
-            key: "Content-Type",
-            value: "application/wasm",
-          },
-          {
-            key: "Cross-Origin-Resource-Policy",
-            value: "cross-origin",
-          },
-        ],
-      },
-      {
-        // Add COOP/COEP headers to HTML pages only (not API routes or static assets)
-        // This prevents 500 errors on Next.js chunks while still enabling SharedArrayBuffer support
-        source: "/:path*",
-        headers: [
-          {
-            key: "Cross-Origin-Opener-Policy",
-            value: "same-origin",
-          },
-          {
-            key: "Cross-Origin-Embedder-Policy",
-            value: "require-corp",
-          },
-        ],
-        // Note: Next.js automatically excludes _next/* and /api/* from header matching
-        // File extensions are handled by other rules above
       },
     ];
   },
