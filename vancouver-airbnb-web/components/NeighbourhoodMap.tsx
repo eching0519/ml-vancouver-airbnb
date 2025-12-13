@@ -1,7 +1,7 @@
 "use client";
 
 import { NeighbourhoodGeoJSON, getNeighbourhoodCentroid } from "@/lib/geoUtils";
-import { Feature } from "geojson";
+import { Feature, GeoJsonObject, Geometry } from "geojson";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect } from "react";
@@ -43,7 +43,7 @@ export default function NeighbourhoodMap({
   geoJsonData,
 }: Props) {
   const onEachFeature = (
-    feature: Feature<any, { neighbourhood: string }>,
+    feature: Feature<Geometry, { neighbourhood: string }>,
     layer: L.Layer
   ) => {
     const name = feature.properties.neighbourhood;
@@ -68,7 +68,7 @@ export default function NeighbourhoodMap({
         const l = e.target;
         l.setStyle({
           weight: 3,
-          color: "#666",
+          color: "#0a4a35",
           dashArray: "",
           fillOpacity: 0.7,
         });
@@ -79,44 +79,48 @@ export default function NeighbourhoodMap({
         if (geoJsonData) {
           const isSelected = name === selectedNeighbourhood;
           l.setStyle({
-            fillColor: isSelected ? "#3b82f6" : "#3388ff",
+            fillColor: isSelected ? "#0a4a35" : "#3a8d7f",
             weight: isSelected ? 3 : 1,
             opacity: 1,
-            color: "white",
+            color: "#ffffff",
             dashArray: "3",
-            fillOpacity: isSelected ? 0.6 : 0.3,
+            fillOpacity: isSelected ? 0.8 : 0.5,
           });
         }
       },
     });
   };
 
-  const style = (
-    feature: Feature<any, { neighbourhood: string }> | undefined
-  ) => {
-    if (!feature) return {};
+  const style = (feature: GeoJsonObject, _layer: L.Layer): L.PathOptions => {
+    if (!feature || feature.type !== "Feature") {
+      return {};
+    }
+    const typedFeature = feature as Feature<
+      Geometry,
+      { neighbourhood: string }
+    >;
     const isSelected =
-      feature.properties.neighbourhood === selectedNeighbourhood;
+      typedFeature.properties.neighbourhood === selectedNeighbourhood;
     return {
-      fillColor: isSelected ? "#3b82f6" : "#3388ff",
+      fillColor: isSelected ? "#0a4a35" : "#3a8d7f",
       weight: isSelected ? 3 : 1,
       opacity: 1,
-      color: "white",
+      color: "#ffffff",
       dashArray: "3",
-      fillOpacity: isSelected ? 0.6 : 0.3,
+      fillOpacity: isSelected ? 0.8 : 0.5,
     };
   };
 
   if (!geoJsonData) {
     return (
-      <div className="h-[400px] w-full bg-slate-100 animate-pulse rounded-lg flex items-center justify-center text-slate-400">
+      <div className="h-[400px] w-full bg-muted animate-pulse rounded-lg flex items-center justify-center text-muted-foreground">
         Loading Map...
       </div>
     );
   }
 
   return (
-    <div className="h-[400px] w-full rounded-lg overflow-hidden border border-slate-200 shadow-sm relative z-0">
+    <div className="h-[400px] w-full rounded-lg overflow-hidden border border-border shadow-sm relative z-0">
       <MapContainer
         center={[49.25, -123.12]} // Initial center
         zoom={11}
@@ -130,8 +134,12 @@ export default function NeighbourhoodMap({
         <GeoJSON
           key={JSON.stringify(geoJsonData) + selectedNeighbourhood} // Force re-render to apply styles
           data={geoJsonData}
-          style={style as any} // Leaflet type mismatch with geojson types sometimes
-          onEachFeature={onEachFeature as any}
+          style={style as unknown as Parameters<typeof GeoJSON>[0]["style"]}
+          onEachFeature={
+            onEachFeature as unknown as Parameters<
+              typeof GeoJSON
+            >[0]["onEachFeature"]
+          }
         />
         <MapUpdater
           selectedNeighbourhood={selectedNeighbourhood}

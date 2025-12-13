@@ -33,7 +33,7 @@ import {
 const NeighbourhoodMap = dynamic(() => import("./NeighbourhoodMap"), {
   ssr: false,
   loading: () => (
-    <div className="h-[400px] w-full bg-slate-100 animate-pulse rounded-lg flex items-center justify-center text-slate-400">
+    <div className="h-[400px] w-full bg-muted animate-pulse rounded-lg flex items-center justify-center text-muted-foreground">
       Loading Map...
     </div>
   ),
@@ -221,7 +221,7 @@ const DistributionChart = ({
   return (
     <div className="mt-4">
       {!hideLabel && (
-        <p className="text-xs text-slate-400 mb-2 text-left">
+        <p className="text-xs text-muted-foreground mb-2 text-left">
           {label} Distribution
         </p>
       )}
@@ -249,18 +249,18 @@ const DistributionChart = ({
             >
               <div
                 className={`w-full rounded-t ${colorClass} ${
-                  val < 0 ? "opacity-30 bg-red-500" : "opacity-60"
+                  val < 0 ? "opacity-30 bg-destructive" : "opacity-60"
                 } group-hover:opacity-100 transition-all cursor-pointer`}
                 style={{ height: `${heightPercent}%` }}
               />
               {/* Tooltip */}
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-max bg-slate-950 text-white text-xs p-2 rounded shadow-xl z-20 pointer-events-none border border-slate-700">
-                <p className="font-bold text-slate-200">
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-max bg-primary text-primary-foreground text-xs p-2 rounded shadow-xl z-20 pointer-events-none border border-primary/50">
+                <p className="font-bold text-primary-foreground">
                   Top {topPercent}% Performer
                 </p>
                 <p
                   className={`text-sm ${
-                    val < 0 ? "text-red-400" : "text-white"
+                    val < 0 ? "text-red-400" : "text-primary-foreground"
                   }`}
                 >
                   ${val.toLocaleString()}
@@ -270,7 +270,7 @@ const DistributionChart = ({
           );
         })}
       </div>
-      <div className="flex justify-between text-[10px] text-slate-500 mt-1 px-1">
+      <div className="flex justify-between text-[10px] text-muted-foreground mt-1 px-1">
         <span>Top 95%</span>
         <span>Top 5%</span>
       </div>
@@ -449,10 +449,10 @@ export default function PredictionForm() {
         className="space-y-8"
       >
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900 mb-2">
-            Vancouver Airbnb Strategy
+          <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2">
+            Vancasa Airbnb Strategy
           </h1>
-          <p className="text-slate-500">
+          <p className="text-muted-foreground">
             Optimize your listing price and predict potential revenue.
           </p>
         </div>
@@ -497,10 +497,10 @@ export default function PredictionForm() {
                     }}
                   />
                   <div className="flex justify-between items-center mt-2">
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       Select a neighbourhood on the map or use the dropdown.
                     </p>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-muted-foreground/70">
                       Lat: {watch("latitude").toFixed(4)}, Lng:{" "}
                       {watch("longitude").toFixed(4)}
                     </div>
@@ -671,12 +671,12 @@ export default function PredictionForm() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Price Form */}
             <motion.div variants={itemVariants}>
-              <Card className="h-full border-blue-100 shadow-blue-50/50">
-                <CardHeader className="bg-blue-50/30 rounded-t-lg">
-                  <CardTitle className="text-blue-900">
+              <Card className="h-full border-accent/40 shadow-lg shadow-accent/10">
+                <CardHeader className="bg-accent/25 rounded-t-lg border-b border-accent/20">
+                  <CardTitle className="text-primary">
                     Price Strategy Inputs
                   </CardTitle>
-                  <p className="text-sm text-blue-600/80">
+                  <p className="text-sm text-muted-foreground">
                     Optimize for optimal nightly rate
                   </p>
                 </CardHeader>
@@ -754,12 +754,12 @@ export default function PredictionForm() {
 
             {/* Revenue Form */}
             <motion.div variants={itemVariants}>
-              <Card className="h-full border-green-100 shadow-green-50/50">
-                <CardHeader className="bg-green-50/30 rounded-t-lg">
-                  <CardTitle className="text-green-900">
+              <Card className="h-full border-secondary/40 shadow-lg shadow-secondary/10">
+                <CardHeader className="bg-secondary/25 rounded-t-lg border-b border-secondary/20">
+                  <CardTitle className="text-primary">
                     Revenue Prediction Inputs
                   </CardTitle>
-                  <p className="text-sm text-green-600/80">
+                  <p className="text-sm text-muted-foreground">
                     Estimate annual revenue potential
                   </p>
                 </CardHeader>
@@ -821,15 +821,15 @@ export default function PredictionForm() {
           <motion.div
             initial={{ opacity: 0, y: 100 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-900 text-white shadow-2xl border-t-2 border-slate-700"
+            className="bg-primary text-primary-foreground shadow-2xl border-t-2 border-primary/50"
           >
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full flex items-center justify-between p-3 hover:bg-slate-800 rounded-none"
+                className="w-full flex items-center justify-between p-3 hover:bg-white/10 rounded-none text-primary-foreground"
               >
                 <div className="flex items-center gap-4 flex-1">
-                  <span className="text-sm font-semibold">
+                  <span className="text-sm font-semibold text-primary-foreground">
                     {result && !loading
                       ? "Prediction Results"
                       : !result && !loading && !error
@@ -841,16 +841,18 @@ export default function PredictionForm() {
                   {!isResultsPanelOpen && result && !loading && (
                     <div className="flex items-center gap-6 text-xs md:text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="text-blue-400 font-medium">
+                        <span className="text-primary-foreground/80 font-medium">
                           Price:
                         </span>
-                        <span className="font-bold">${result.price.point}</span>
+                        <span className="font-bold text-primary-foreground">
+                          ${result.price.point}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-green-400 font-medium">
+                        <span className="text-primary-foreground/80 font-medium">
                           Revenue:
                         </span>
-                        <span className="font-bold">
+                        <span className="font-bold text-primary-foreground">
                           ${result.revenue.point.toLocaleString()}
                         </span>
                       </div>
@@ -858,9 +860,9 @@ export default function PredictionForm() {
                   )}
                 </div>
                 {isResultsPanelOpen ? (
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-4 w-4 text-primary-foreground" />
                 ) : (
-                  <ChevronUp className="h-4 w-4" />
+                  <ChevronUp className="h-4 w-4 text-primary-foreground" />
                 )}
               </Button>
             </CollapsibleTrigger>
@@ -868,11 +870,11 @@ export default function PredictionForm() {
               <div className="max-h-[40vh] md:max-h-[60vh] overflow-y-auto">
                 <div className="max-w-6xl mx-auto p-3 md:p-6">
                   {!result && !loading && !error && (
-                    <Alert className="bg-slate-800 border-slate-700 text-slate-200">
-                      <AlertTitle className="text-lg md:text-2xl font-bold mb-1 md:mb-2">
+                    <Alert className="bg-card border-border text-card-foreground">
+                      <AlertTitle className="text-lg md:text-2xl font-bold mb-1 md:mb-2 text-foreground">
                         Ready to Predict
                       </AlertTitle>
-                      <AlertDescription className="text-xs md:text-base text-slate-400">
+                      <AlertDescription className="text-xs md:text-base text-foreground/80">
                         Adjust the property details above to see your estimated
                         revenue and price.
                       </AlertDescription>
@@ -880,26 +882,26 @@ export default function PredictionForm() {
                   )}
                   {loading && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
-                      <Card className="bg-slate-800 border-slate-700 text-center min-h-[140px] md:min-h-[180px]">
+                      <Card className="bg-card border-border text-center min-h-[140px] md:min-h-[180px]">
                         <CardContent className="p-3 md:p-6 h-full flex items-center justify-center">
                           <div className="animate-pulse space-y-3 w-full">
-                            <div className="h-4 bg-slate-700 rounded w-3/4 mx-auto"></div>
-                            <div className="h-12 bg-slate-700 rounded w-1/2 mx-auto"></div>
+                            <div className="h-4 bg-muted rounded w-3/4 mx-auto"></div>
+                            <div className="h-12 bg-muted rounded w-1/2 mx-auto"></div>
                             <div className="flex items-center justify-center gap-2">
-                              <div className="h-4 bg-slate-700 rounded flex-1"></div>
-                              <div className="h-8 w-8 bg-slate-700 rounded shrink-0"></div>
+                              <div className="h-4 bg-muted rounded flex-1"></div>
+                              <div className="h-8 w-8 bg-muted rounded shrink-0"></div>
                             </div>
                           </div>
                         </CardContent>
                       </Card>
-                      <Card className="bg-slate-800 border-slate-700 text-center min-h-[140px] md:min-h-[180px]">
+                      <Card className="bg-card border-border text-center min-h-[140px] md:min-h-[180px]">
                         <CardContent className="p-3 md:p-6 h-full flex items-center justify-center">
                           <div className="animate-pulse space-y-3 w-full">
-                            <div className="h-4 bg-slate-700 rounded w-3/4 mx-auto"></div>
-                            <div className="h-12 bg-slate-700 rounded w-1/2 mx-auto"></div>
+                            <div className="h-4 bg-muted rounded w-3/4 mx-auto"></div>
+                            <div className="h-12 bg-muted rounded w-1/2 mx-auto"></div>
                             <div className="flex items-center justify-center gap-2">
-                              <div className="h-4 bg-slate-700 rounded flex-1"></div>
-                              <div className="h-8 w-8 bg-slate-700 rounded shrink-0"></div>
+                              <div className="h-4 bg-muted rounded flex-1"></div>
+                              <div className="h-8 w-8 bg-muted rounded shrink-0"></div>
                             </div>
                           </div>
                         </CardContent>
@@ -909,26 +911,28 @@ export default function PredictionForm() {
                   {error && (
                     <Alert
                       variant="destructive"
-                      className="bg-slate-800 border-red-500/50"
+                      className="bg-destructive/10 border-destructive/50"
                     >
-                      <AlertTitle className="text-red-400">Error</AlertTitle>
-                      <AlertDescription className="text-red-400 text-sm md:text-lg">
+                      <AlertTitle className="text-destructive">
+                        Error
+                      </AlertTitle>
+                      <AlertDescription className="text-destructive text-sm md:text-lg">
                         {error}
                       </AlertDescription>
                     </Alert>
                   )}
                   {result && !loading && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
-                      <Card className="bg-slate-800 border-slate-700 text-center min-h-[140px] md:min-h-[180px]">
+                      <Card className="bg-card border-border text-center min-h-[140px] md:min-h-[180px]">
                         <CardContent className="p-3 md:p-6">
-                          <p className="text-blue-400 font-medium mb-1 md:mb-2 text-xs md:text-base">
+                          <p className="text-primary font-medium mb-1 md:mb-2 text-xs md:text-base">
                             Suggested Nightly Price
                           </p>
-                          <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
+                          <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2 text-foreground">
                             ${result.price.point}
                           </p>
                           <div className="flex items-center justify-center gap-2 mb-1">
-                            <p className="text-slate-400 text-xs md:text-sm">
+                            <p className="text-foreground/70 text-xs md:text-sm">
                               Range: ${result.price.lower} - $
                               {result.price.upper}
                             </p>
@@ -936,7 +940,7 @@ export default function PredictionForm() {
                               variant="ghost"
                               size="icon"
                               onClick={() => setActiveChart("price")}
-                              className="h-8 w-8 text-slate-400 hover:text-blue-400 hover:bg-slate-700"
+                              className="h-8 w-8 text-foreground/70 hover:text-primary hover:bg-primary/20 hover:border hover:border-primary/30"
                               title="View Distribution"
                             >
                               <BarChart2 className="h-4 w-4" />
@@ -944,16 +948,16 @@ export default function PredictionForm() {
                           </div>
                         </CardContent>
                       </Card>
-                      <Card className="bg-slate-800 border-slate-700 text-center min-h-[140px] md:min-h-[180px]">
+                      <Card className="bg-card border-border text-center min-h-[140px] md:min-h-[180px]">
                         <CardContent className="p-3 md:p-6">
-                          <p className="text-green-400 font-medium mb-1 md:mb-2 text-xs md:text-base">
+                          <p className="text-secondary font-medium mb-1 md:mb-2 text-xs md:text-base">
                             Est. Annual Revenue
                           </p>
-                          <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2">
+                          <p className="text-2xl md:text-5xl font-bold mb-1 md:mb-2 text-foreground">
                             ${result.revenue.point.toLocaleString()}
                           </p>
                           <div className="flex items-center justify-center gap-2 mb-1">
-                            <p className="text-slate-400 text-xs md:text-sm">
+                            <p className="text-foreground/70 text-xs md:text-sm">
                               Range: ${result.revenue.lower.toLocaleString()} -
                               ${result.revenue.upper.toLocaleString()}
                             </p>
@@ -961,7 +965,7 @@ export default function PredictionForm() {
                               variant="ghost"
                               size="icon"
                               onClick={() => setActiveChart("revenue")}
-                              className="h-8 w-8 text-slate-400 hover:text-green-400 hover:bg-slate-700"
+                              className="h-8 w-8 text-foreground/70 hover:text-secondary hover:bg-secondary/20 hover:border hover:border-secondary/30"
                               title="View Distribution"
                             >
                               <BarChart2 className="h-4 w-4" />
@@ -983,9 +987,9 @@ export default function PredictionForm() {
         open={!!activeChart}
         onOpenChange={(open) => !open && setActiveChart(null)}
       >
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg">
+        <DialogContent className="bg-card border-border text-card-foreground max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-white">
+            <DialogTitle className="text-xl font-bold text-card-foreground">
               {activeChart === "price"
                 ? "Price Distribution"
                 : "Revenue Distribution"}
@@ -994,7 +998,7 @@ export default function PredictionForm() {
           {result && activeChart === "price" && (
             <DistributionChart
               data={result.price.distribution}
-              colorClass="bg-blue-500"
+              colorClass="bg-accent"
               label="Price"
               hideLabel
             />
@@ -1002,7 +1006,7 @@ export default function PredictionForm() {
           {result && activeChart === "revenue" && (
             <DistributionChart
               data={result.revenue.distribution}
-              colorClass="bg-green-500"
+              colorClass="bg-secondary"
               label="Revenue"
               hideLabel
             />

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Vancouver Airbnb Strategy",
+  title: "Vancasa Airbnb Strategy",
   description: "Optimize your listing price and predict potential revenue.",
 };
 
