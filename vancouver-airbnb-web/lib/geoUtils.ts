@@ -1,10 +1,13 @@
-import { Feature, FeatureCollection, Geometry, Position } from 'geojson';
+import { Feature, FeatureCollection, Geometry, Position } from "geojson";
 
 export interface NeighbourhoodGeoJSON extends FeatureCollection {
   features: Array<Feature<Geometry, { neighbourhood: string }>>;
 }
 
-export function calculateCentroid(coordinates: Position[][]): { lat: number; lng: number } {
+export function calculateCentroid(coordinates: Position[][]): {
+  lat: number;
+  lng: number;
+} {
   let xSum = 0;
   let ySum = 0;
   let len = 0;
@@ -18,7 +21,7 @@ export function calculateCentroid(coordinates: Position[][]): { lat: number; lng
   const points: Position[] = [];
 
   const flatten = (coords: any[]) => {
-    if (typeof coords[0] === 'number') {
+    if (typeof coords[0] === "number") {
       points.push(coords as Position);
     } else {
       coords.forEach(flatten);
@@ -52,13 +55,12 @@ export function getNeighbourhoodCentroid(
   }
 
   const geometry = feature.geometry;
-  
-  if (geometry.type === 'Polygon') {
+
+  if (geometry.type === "Polygon") {
     return calculateCentroid(geometry.coordinates);
-  } else if (geometry.type === 'MultiPolygon') {
+  } else if (geometry.type === "MultiPolygon") {
     return calculateCentroid(geometry.coordinates as any);
   }
 
   return null;
 }
-

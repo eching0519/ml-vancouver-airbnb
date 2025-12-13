@@ -98,9 +98,9 @@ export interface PredictionFormData {
   longitude: number;
   amenities: string[];
 
-  // Optional Text Fields (will default to empty if not provided)
-  name?: string;
-  description?: string;
+  // Optional Text Fields (character counts - will default to 0 if not provided)
+  name?: number;
+  description?: number;
 
   // Price Strategy Inputs
   instant_bookable: boolean;
@@ -409,12 +409,14 @@ export class InferenceEngine {
     }
 
     // 7. Text Features
-    const name = data.name || "";
-    const desc = data.description || "";
+    // name and description are now character counts (numbers)
+    const nameLen = data.name ?? medians["name_len"] ?? 20;
+    const descLen = data.description ?? medians["desc_len"] ?? 100;
 
-    setF("name_len", name.length || medians["name_len"] || 20); // Fallback
-    setF("desc_len", desc.length || medians["desc_len"] || 100);
+    setF("name_len", nameLen);
+    setF("desc_len", descLen);
 
+    // Keyword features are set to 0 since we only have character counts, not actual text
     const keywords = [
       "view",
       "luxury",
@@ -427,9 +429,7 @@ export class InferenceEngine {
       "spacious",
     ];
     keywords.forEach((k) => {
-      const hasKw =
-        this.getKeywordFeature(name, k) || this.getKeywordFeature(desc, k);
-      setF(`txt_${k}`, hasKw);
+      setF(`txt_${k}`, 0);
     });
 
     // 8. Computed Features

@@ -4,7 +4,7 @@ import { NeighbourhoodGeoJSON, getNeighbourhoodCentroid } from "@/lib/geoUtils";
 import { PredictionFormData, PredictionResult } from "@/lib/inference";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { motion } from "framer-motion";
-import { BarChart2, ChevronDown, ChevronUp } from "lucide-react";
+import { ChartColumnBig, ChevronDown, ChevronUp } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, Resolver, useForm } from "react-hook-form";
@@ -156,9 +156,9 @@ const schema = yup.object({
   longitude: yup.number().required().typeError("Must be a number"),
   amenities: yup.array().of(yup.string()).required(),
 
-  // Text Features
-  name: yup.string().notRequired(),
-  description: yup.string().notRequired(),
+  // Text Features (character counts)
+  name: yup.number().min(0).notRequired().typeError("Must be a number"),
+  description: yup.number().min(0).notRequired().typeError("Must be a number"),
 
   // Price Strategy Inputs
   instant_bookable: yup.boolean().required(),
@@ -313,8 +313,8 @@ export default function PredictionForm() {
       instant_bookable: false,
       host_is_superhost: false,
       host_identity_verified: true,
-      name: "",
-      description: "",
+      name: 30,
+      description: 300,
       neighbourhood_cleansed: "Downtown",
       property_type: "Entire condo",
     },
@@ -465,48 +465,6 @@ export default function PredictionForm() {
                 <CardTitle>Property Details</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="col-span-1 md:col-span-2 lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Listing Title (Optional)</Label>
-                    <Input
-                      id="name"
-                      placeholder="e.g. Luxury Condo with Ocean View"
-                      {...register("name")}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description (Optional)</Label>
-                    <Input
-                      id="description"
-                      placeholder="Describe the key features..."
-                      {...register("description")}
-                    />
-                  </div>
-                </div>
-
-                {/* Map Section */}
-                <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                  <Label className="mb-2 block">Location</Label>
-                  <NeighbourhoodMap
-                    geoJsonData={geoJsonData}
-                    selectedNeighbourhood={selectedNeighbourhood}
-                    onSelectNeighbourhood={(name, lat, lng) => {
-                      setValue("neighbourhood_cleansed", name);
-                      setValue("latitude", lat);
-                      setValue("longitude", lng);
-                    }}
-                  />
-                  <div className="flex justify-between items-center mt-2">
-                    <p className="text-xs text-muted-foreground">
-                      Select a neighbourhood on the map or use the dropdown.
-                    </p>
-                    <div className="text-xs text-muted-foreground/70">
-                      Lat: {watch("latitude").toFixed(4)}, Lng:{" "}
-                      {watch("longitude").toFixed(4)}
-                    </div>
-                  </div>
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="neighbourhood">Neighbourhood</Label>
                   <Controller
@@ -582,6 +540,25 @@ export default function PredictionForm() {
                       {errors.accommodates.message}
                     </p>
                   )}
+                </div>
+
+                {/* Map Section */}
+                <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                  <NeighbourhoodMap
+                    geoJsonData={geoJsonData}
+                    selectedNeighbourhood={selectedNeighbourhood}
+                    onSelectNeighbourhood={(name, lat, lng) => {
+                      setValue("neighbourhood_cleansed", name);
+                      setValue("latitude", lat);
+                      setValue("longitude", lng);
+                    }}
+                  />
+                  <div className="flex justify-between items-center mt-2">
+                    <div className="text-xs text-muted-foreground/70">
+                      Lat: {watch("latitude").toFixed(4)}, Lng:{" "}
+                      {watch("longitude").toFixed(4)}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -667,148 +644,215 @@ export default function PredictionForm() {
             </Card>
           </motion.div>
 
-          {/* Split Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Price Form */}
-            <motion.div variants={itemVariants}>
-              <Card className="h-full border-accent/40 shadow-lg shadow-accent/10">
-                <CardHeader className="bg-accent/25 rounded-t-lg border-b border-accent/20">
-                  <CardTitle className="text-primary">
-                    Price Strategy Inputs
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Optimize for optimal nightly rate
+          {/* Host & Booking Settings */}
+          <motion.div variants={itemVariants} className="mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Host & Booking Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-0">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Title Length</Label>
+                  <Input
+                    id="name"
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 50"
+                    {...register("name")}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Number of characters in the listing title
                   </p>
-                </CardHeader>
-                <CardContent className="space-y-6 mt-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between rounded-lg border p-4">
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description Length</Label>
+                  <Input
+                    id="description"
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 500"
+                    {...register("description")}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Number of characters in the listing description
+                  </p>
+                </div>
+              </CardContent>
+              <CardContent className="space-y-4">
+                <Controller
+                  name="instant_bookable"
+                  control={control}
+                  render={({ field }) => (
+                    <div
+                      className="flex items-center justify-between rounded-lg border p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                      onClick={(e) => {
+                        // Only toggle if clicking outside the checkbox
+                        const target = e.target as HTMLElement;
+                        if (
+                          !target.closest('[role="checkbox"]') &&
+                          !target.closest("button")
+                        ) {
+                          field.onChange(!field.value);
+                        }
+                      }}
+                    >
                       <div className="space-y-0.5">
                         <Label className="text-base">Instant Bookable</Label>
                         <p className="text-sm text-muted-foreground">
                           Allows guests to book without approval
                         </p>
                       </div>
-                      <Controller
-                        name="instant_bookable"
-                        control={control}
-                        render={({ field }) => (
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        )}
-                      />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            if (checked !== field.value) {
+                              field.onChange(checked);
+                            }
+                          }}
+                        />
+                      </div>
                     </div>
+                  )}
+                />
 
-                    <div className="flex items-center justify-between rounded-lg border p-4">
+                <Controller
+                  name="host_is_superhost"
+                  control={control}
+                  render={({ field }) => (
+                    <div
+                      className="flex items-center justify-between rounded-lg border p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                      onClick={(e) => {
+                        // Only toggle if clicking outside the checkbox
+                        const target = e.target as HTMLElement;
+                        if (
+                          !target.closest('[role="checkbox"]') &&
+                          !target.closest("button")
+                        ) {
+                          field.onChange(!field.value);
+                        }
+                      }}
+                    >
                       <div className="space-y-0.5">
                         <Label className="text-base">Superhost</Label>
                         <p className="text-sm text-muted-foreground">
                           Host has Superhost status
                         </p>
                       </div>
-                      <Controller
-                        name="host_is_superhost"
-                        control={control}
-                        render={({ field }) => (
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        )}
-                      />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            if (checked !== field.value) {
+                              field.onChange(checked);
+                            }
+                          }}
+                        />
+                      </div>
                     </div>
+                  )}
+                />
 
-                    <div className="flex items-center justify-between rounded-lg border p-4">
+                <Controller
+                  name="host_identity_verified"
+                  control={control}
+                  render={({ field }) => (
+                    <div
+                      className="flex items-center justify-between rounded-lg border p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                      onClick={(e) => {
+                        // Only toggle if clicking outside the checkbox
+                        const target = e.target as HTMLElement;
+                        if (
+                          !target.closest('[role="checkbox"]') &&
+                          !target.closest("button")
+                        ) {
+                          field.onChange(!field.value);
+                        }
+                      }}
+                    >
                       <div className="space-y-0.5">
                         <Label className="text-base">Identity Verified</Label>
                         <p className="text-sm text-muted-foreground">
                           Host identity is verified
                         </p>
                       </div>
-                      <Controller
-                        name="host_identity_verified"
-                        control={control}
-                        render={({ field }) => (
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        )}
-                      />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            if (checked !== field.value) {
+                              field.onChange(checked);
+                            }
+                          }}
+                        />
+                      </div>
                     </div>
+                  )}
+                />
 
-                    <div className="space-y-2">
-                      <Label>Host Experience (Years)</Label>
-                      <Input
-                        type="number"
-                        step="0.5"
-                        {...register("host_experience_years")}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+                <div className="space-y-2">
+                  <Label>Host Experience (Years)</Label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    {...register("host_experience_years")}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-            {/* Revenue Form */}
-            <motion.div variants={itemVariants}>
-              <Card className="h-full border-secondary/40 shadow-lg shadow-secondary/10">
-                <CardHeader className="bg-secondary/25 rounded-t-lg border-b border-secondary/20">
-                  <CardTitle className="text-primary">
-                    Revenue Prediction Inputs
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Estimate annual revenue potential
+          {/* Listing Performance */}
+          <motion.div variants={itemVariants}>
+            <Card>
+              <CardHeader>
+                <CardTitle>Listing Performance</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label>Availability (Days per Year)</Label>
+                  <Input type="number" {...register("availability_365")} />
+                  <p className="text-xs text-muted-foreground">
+                    How many days is the listing available?
                   </p>
-                </CardHeader>
-                <CardContent className="space-y-6 mt-6">
-                  <div className="space-y-2">
-                    <Label>Availability (Days per Year)</Label>
-                    <Input type="number" {...register("availability_365")} />
-                    <p className="text-xs text-muted-foreground">
-                      How many days is the listing available?
+                  {errors.availability_365 && (
+                    <p className="text-red-500 text-xs">
+                      {errors.availability_365.message}
                     </p>
-                    {errors.availability_365 && (
-                      <p className="text-red-500 text-xs">
-                        {errors.availability_365.message}
-                      </p>
-                    )}
-                  </div>
+                  )}
+                </div>
 
-                  <div className="space-y-2">
-                    <Label>Reviews per Month</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      {...register("reviews_per_month")}
-                    />
-                    {errors.reviews_per_month && (
-                      <p className="text-red-500 text-xs">
-                        {errors.reviews_per_month.message}
-                      </p>
-                    )}
-                  </div>
+                <div className="space-y-2">
+                  <Label>Reviews per Month</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    {...register("reviews_per_month")}
+                  />
+                  {errors.reviews_per_month && (
+                    <p className="text-red-500 text-xs">
+                      {errors.reviews_per_month.message}
+                    </p>
+                  )}
+                </div>
 
-                  <div className="space-y-2">
-                    <Label>Review Rating (0-5)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      max="5"
-                      {...register("review_scores_rating")}
-                    />
-                    {errors.review_scores_rating && (
-                      <p className="text-red-500 text-xs">
-                        {errors.review_scores_rating.message}
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
+                <div className="space-y-2">
+                  <Label>Review Rating (0-5)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    max="5"
+                    {...register("review_scores_rating")}
+                  />
+                  {errors.review_scores_rating && (
+                    <p className="text-red-500 text-xs">
+                      {errors.review_scores_rating.message}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </form>
       </motion.div>
 
@@ -943,7 +987,7 @@ export default function PredictionForm() {
                               className="h-8 w-8 text-foreground/70 hover:text-primary hover:bg-primary/20 hover:border hover:border-primary/30"
                               title="View Distribution"
                             >
-                              <BarChart2 className="h-4 w-4" />
+                              <ChartColumnBig className="h-4 w-4" />
                             </Button>
                           </div>
                         </CardContent>
@@ -968,7 +1012,7 @@ export default function PredictionForm() {
                               className="h-8 w-8 text-foreground/70 hover:text-secondary hover:bg-secondary/20 hover:border hover:border-secondary/30"
                               title="View Distribution"
                             >
-                              <BarChart2 className="h-4 w-4" />
+                              <ChartColumnBig className="h-4 w-4" />
                             </Button>
                           </div>
                         </CardContent>
