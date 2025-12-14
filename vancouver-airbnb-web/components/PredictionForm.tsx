@@ -872,7 +872,10 @@ export default function PredictionForm() {
                     <div className="flex items-center gap-6 text-xs md:text-sm">
                       <div className="flex items-center gap-2">
                         <span className="text-primary-foreground/80 font-medium">
-                          Suggested Nightly Price:
+                          <span className="md:hidden">Price:</span>
+                          <span className="hidden md:inline">
+                            Suggested Nightly Price:
+                          </span>
                         </span>
                         <span className="font-bold text-primary-foreground">
                           ${result.price.point}
@@ -880,7 +883,10 @@ export default function PredictionForm() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-primary-foreground/80 font-medium">
-                          Estimated Annual Revenue:
+                          <span className="md:hidden">Revenue:</span>
+                          <span className="hidden md:inline">
+                            Estimated Annual Revenue:
+                          </span>
                         </span>
                         <span className="font-bold text-primary-foreground">
                           ${result.revenue.point.toLocaleString()}
@@ -932,7 +938,7 @@ export default function PredictionForm() {
                   )}
                   {result && !loading && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
-                      <Card className="border-border text-center min-h-[140px] md:min-h-[180px] bg-white">
+                      <Card className="border-border text-center bg-white">
                         <CardContent className="p-3 md:p-6">
                           <p className="text-primary font-medium mb-1 md:mb-2 text-xs md:text-base">
                             Suggested Nightly Price
@@ -955,7 +961,7 @@ export default function PredictionForm() {
                           </div>
                         </CardContent>
                       </Card>
-                      <Card className="border-border text-center min-h-[140px] md:min-h-[180px] bg-white">
+                      <Card className="border-border text-center bg-white">
                         <CardContent className="p-3 md:p-6">
                           <p className="text-secondary font-medium mb-1 md:mb-2 text-xs md:text-base">
                             Est. Annual Revenue
